@@ -4,15 +4,17 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
-)
 
-import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/win32/winuser"
 )
 
 type CaseMode uint32
@@ -45,8 +47,8 @@ func newLineEdit(parent Window) (*LineEdit, error) {
 		le,
 		parent,
 		"EDIT",
-		win.WS_CHILD|win.WS_TABSTOP|win.WS_VISIBLE|win.ES_AUTOHSCROLL,
-		win.WS_EX_CLIENTEDGE); err != nil {
+		user32.WS_CHILD|user32.WS_TABSTOP|user32.WS_VISIBLE|winuser.ES_AUTOHSCROLL,
+		user32.WS_EX_CLIENTEDGE); err != nil {
 		return nil, err
 	}
 
@@ -103,7 +105,7 @@ func NewLineEdit(parent Container) (*LineEdit, error) {
 
 func (le *LineEdit) CueBanner() string {
 	buf := make([]uint16, 128)
-	if win.FALSE == le.SendMessage(win.EM_GETCUEBANNER, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))) {
+	if win.FALSE == le.SendMessage(winuser.EM_GETCUEBANNER, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))) {
 		newError("EM_GETCUEBANNER failed")
 		return ""
 	}
@@ -112,7 +114,11 @@ func (le *LineEdit) CueBanner() string {
 }
 
 func (le *LineEdit) SetCueBanner(value string) error {
-	if win.FALSE == le.SendMessage(win.EM_SETCUEBANNER, win.FALSE, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(value)))) {
+	strPtr, err := syscall.UTF16PtrFromString(value)
+	if err != nil {
+		newError(err.Error())
+	}
+	if win.FALSE == le.SendMessage(winuser.EM_SETCUEBANNER, win.FALSE, uintptr(unsafe.Pointer(strPtr))) {
 		return newError("EM_SETCUEBANNER failed")
 	}
 
@@ -120,11 +126,11 @@ func (le *LineEdit) SetCueBanner(value string) error {
 }
 
 func (le *LineEdit) MaxLength() int {
-	return int(le.SendMessage(win.EM_GETLIMITTEXT, 0, 0))
+	return int(le.SendMessage(winuser.EM_GETLIMITTEXT, 0, 0))
 }
 
 func (le *LineEdit) SetMaxLength(value int) {
-	le.SendMessage(win.EM_LIMITTEXT, uintptr(value), 0)
+	le.SendMessage(winuser.EM_LIMITTEXT, uintptr(value), 0)
 }
 
 func (le *LineEdit) Text() string {
@@ -136,20 +142,20 @@ func (le *LineEdit) SetText(value string) error {
 }
 
 func (le *LineEdit) TextSelection() (start, end int) {
-	le.SendMessage(win.EM_GETSEL, uintptr(unsafe.Pointer(&start)), uintptr(unsafe.Pointer(&end)))
+	le.SendMessage(winuser.EM_GETSEL, uintptr(unsafe.Pointer(&start)), uintptr(unsafe.Pointer(&end)))
 	return
 }
 
 func (le *LineEdit) SetTextSelection(start, end int) {
-	le.SendMessage(win.EM_SETSEL, uintptr(start), uintptr(end))
+	le.SendMessage(winuser.EM_SETSEL, uintptr(start), uintptr(end))
 }
 
 func (le *LineEdit) TextAlignment() Alignment1D {
-	switch win.GetWindowLong(le.hWnd, win.GWL_STYLE) & (win.ES_LEFT | win.ES_CENTER | win.ES_RIGHT) {
-	case win.ES_CENTER:
+	switch user32.GetWindowLong(le.hWnd, user32.GWL_STYLE) & (winuser.ES_LEFT | winuser.ES_CENTER | winuser.ES_RIGHT) {
+	case winuser.ES_CENTER:
 		return AlignCenter
 
-	case win.ES_RIGHT:
+	case winuser.ES_RIGHT:
 		return AlignFar
 	}
 
@@ -165,24 +171,24 @@ func (le *LineEdit) SetTextAlignment(alignment Alignment1D) error {
 
 	switch alignment {
 	case AlignCenter:
-		bit = win.ES_CENTER
+		bit = winuser.ES_CENTER
 
 	case AlignFar:
-		bit = win.ES_RIGHT
+		bit = winuser.ES_RIGHT
 
 	default:
-		bit = win.ES_LEFT
+		bit = winuser.ES_LEFT
 	}
 
-	return le.setAndClearStyleBits(bit, win.ES_LEFT|win.ES_CENTER|win.ES_RIGHT)
+	return le.setAndClearStyleBits(bit, winuser.ES_LEFT|winuser.ES_CENTER|winuser.ES_RIGHT)
 }
 
 func (le *LineEdit) CaseMode() CaseMode {
-	style := uint32(win.GetWindowLong(le.hWnd, win.GWL_STYLE))
+	style := uint32(user32.GetWindowLong(le.hWnd, user32.GWL_STYLE))
 
-	if style&win.ES_UPPERCASE != 0 {
+	if style&winuser.ES_UPPERCASE != 0 {
 		return CaseModeUpper
-	} else if style&win.ES_LOWERCASE != 0 {
+	} else if style&winuser.ES_LOWERCASE != 0 {
 		return CaseModeLower
 	} else {
 		return CaseModeMixed
@@ -194,15 +200,15 @@ func (le *LineEdit) SetCaseMode(mode CaseMode) error {
 
 	switch mode {
 	case CaseModeMixed:
-		clear = win.ES_UPPERCASE | win.ES_LOWERCASE
+		clear = winuser.ES_UPPERCASE | winuser.ES_LOWERCASE
 
 	case CaseModeUpper:
-		set = win.ES_UPPERCASE
-		clear = win.ES_LOWERCASE
+		set = winuser.ES_UPPERCASE
+		clear = winuser.ES_LOWERCASE
 
 	case CaseModeLower:
-		set = win.ES_LOWERCASE
-		clear = win.ES_UPPERCASE
+		set = winuser.ES_LOWERCASE
+		clear = winuser.ES_UPPERCASE
 
 	default:
 		panic("invalid CaseMode")
@@ -212,7 +218,7 @@ func (le *LineEdit) SetCaseMode(mode CaseMode) error {
 }
 
 func (le *LineEdit) PasswordMode() bool {
-	return le.SendMessage(win.EM_GETPASSWORDCHAR, 0, 0) != 0
+	return le.SendMessage(winuser.EM_GETPASSWORDCHAR, 0, 0) != 0
 }
 
 func (le *LineEdit) SetPasswordMode(value bool) {
@@ -221,15 +227,15 @@ func (le *LineEdit) SetPasswordMode(value bool) {
 		c = uintptr('*')
 	}
 
-	le.SendMessage(win.EM_SETPASSWORDCHAR, c, 0)
+	le.SendMessage(winuser.EM_SETPASSWORDCHAR, c, 0)
 }
 
 func (le *LineEdit) ReadOnly() bool {
-	return le.hasStyleBits(win.ES_READONLY)
+	return le.hasStyleBits(winuser.ES_READONLY)
 }
 
 func (le *LineEdit) SetReadOnly(readOnly bool) error {
-	if 0 == le.SendMessage(win.EM_SETREADONLY, uintptr(win.BoolToBOOL(readOnly)), 0) {
+	if le.SendMessage(winuser.EM_SETREADONLY, uintptr(win.BoolToBOOL(readOnly)), 0) == 0 {
 		return newError("SendMessage(EM_SETREADONLY)")
 	}
 
@@ -262,19 +268,19 @@ func (le *LineEdit) initCharWidth() {
 	le.charWidthFont = font
 	le.charWidth = 8
 
-	hdc := win.GetDC(le.hWnd)
+	hdc := user32.GetDC(le.hWnd)
 	if hdc == 0 {
 		newError("GetDC failed")
 		return
 	}
-	defer win.ReleaseDC(le.hWnd, hdc)
+	defer user32.ReleaseDC(le.hWnd, hdc)
 
-	defer win.SelectObject(hdc, win.SelectObject(hdc, win.HGDIOBJ(font.handleForDPI(le.DPI()))))
+	defer gdi32.SelectObject(hdc, gdi32.SelectObject(hdc, gdi32.HGDIOBJ(font.handleForDPI(le.DPI()))))
 
 	buf := []uint16{'M'}
 
-	var s win.SIZE
-	if !win.GetTextExtentPoint32(hdc, &buf[0], int32(len(buf)), &s) {
+	var s gdi32.SIZE
+	if !gdi32.GetTextExtentPoint32(hdc, &buf[0], int32(len(buf)), &s) {
 		newError("GetTextExtentPoint32 failed")
 		return
 	}
@@ -303,15 +309,15 @@ func (*LineEdit) NeedsWmSize() bool {
 	return true
 }
 
-func (le *LineEdit) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (le *LineEdit) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_COMMAND:
+	case user32.WM_COMMAND:
 		switch win.HIWORD(uint32(wParam)) {
-		case win.EN_CHANGE:
+		case winuser.EN_CHANGE:
 			le.textChangedPublisher.Publish()
 		}
 
-	case win.WM_GETDLGCODE:
+	case user32.WM_GETDLGCODE:
 		if form := ancestor(le); form != nil {
 			if dlg, ok := form.(dialogish); ok {
 				if dlg.DefaultButton() != nil {
@@ -322,11 +328,11 @@ func (le *LineEdit) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) u
 			}
 		}
 
-		if wParam == win.VK_RETURN {
-			return win.DLGC_WANTALLKEYS
+		if wParam == user32.VK_RETURN {
+			return user32.DLGC_WANTALLKEYS
 		}
 
-	case win.WM_KEYDOWN:
+	case user32.WM_KEYDOWN:
 		switch Key(wParam) {
 		case KeyA:
 			if ControlDown() {
@@ -337,7 +343,7 @@ func (le *LineEdit) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) u
 			le.editingFinishedPublisher.Publish()
 		}
 
-	case win.WM_KILLFOCUS:
+	case user32.WM_KILLFOCUS:
 		// FIXME: This may be dangerous, see remarks section:
 		// http://msdn.microsoft.com/en-us/library/ms646282(v=vs.85).aspx
 		le.editingFinishedPublisher.Publish()

@@ -4,14 +4,12 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"bytes"
-)
 
-import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/user32"
 )
 
 type Key uint16
@@ -21,49 +19,49 @@ func (k Key) String() string {
 }
 
 const (
-	KeyLButton           Key = win.VK_LBUTTON
-	KeyRButton           Key = win.VK_RBUTTON
-	KeyCancel            Key = win.VK_CANCEL
-	KeyMButton           Key = win.VK_MBUTTON
-	KeyXButton1          Key = win.VK_XBUTTON1
-	KeyXButton2          Key = win.VK_XBUTTON2
-	KeyBack              Key = win.VK_BACK
-	KeyTab               Key = win.VK_TAB
-	KeyClear             Key = win.VK_CLEAR
-	KeyReturn            Key = win.VK_RETURN
-	KeyShift             Key = win.VK_SHIFT
-	KeyControl           Key = win.VK_CONTROL
-	KeyAlt               Key = win.VK_MENU
-	KeyMenu              Key = win.VK_MENU
-	KeyPause             Key = win.VK_PAUSE
-	KeyCapital           Key = win.VK_CAPITAL
-	KeyKana              Key = win.VK_KANA
-	KeyHangul            Key = win.VK_HANGUL
-	KeyJunja             Key = win.VK_JUNJA
-	KeyFinal             Key = win.VK_FINAL
-	KeyHanja             Key = win.VK_HANJA
-	KeyKanji             Key = win.VK_KANJI
-	KeyEscape            Key = win.VK_ESCAPE
-	KeyConvert           Key = win.VK_CONVERT
-	KeyNonconvert        Key = win.VK_NONCONVERT
-	KeyAccept            Key = win.VK_ACCEPT
-	KeyModeChange        Key = win.VK_MODECHANGE
-	KeySpace             Key = win.VK_SPACE
-	KeyPrior             Key = win.VK_PRIOR
-	KeyNext              Key = win.VK_NEXT
-	KeyEnd               Key = win.VK_END
-	KeyHome              Key = win.VK_HOME
-	KeyLeft              Key = win.VK_LEFT
-	KeyUp                Key = win.VK_UP
-	KeyRight             Key = win.VK_RIGHT
-	KeyDown              Key = win.VK_DOWN
-	KeySelect            Key = win.VK_SELECT
-	KeyPrint             Key = win.VK_PRINT
-	KeyExecute           Key = win.VK_EXECUTE
-	KeySnapshot          Key = win.VK_SNAPSHOT
-	KeyInsert            Key = win.VK_INSERT
-	KeyDelete            Key = win.VK_DELETE
-	KeyHelp              Key = win.VK_HELP
+	KeyLButton           Key = user32.VK_LBUTTON
+	KeyRButton           Key = user32.VK_RBUTTON
+	KeyCancel            Key = user32.VK_CANCEL
+	KeyMButton           Key = user32.VK_MBUTTON
+	KeyXButton1          Key = user32.VK_XBUTTON1
+	KeyXButton2          Key = user32.VK_XBUTTON2
+	KeyBack              Key = user32.VK_BACK
+	KeyTab               Key = user32.VK_TAB
+	KeyClear             Key = user32.VK_CLEAR
+	KeyReturn            Key = user32.VK_RETURN
+	KeyShift             Key = user32.VK_SHIFT
+	KeyControl           Key = user32.VK_CONTROL
+	KeyAlt               Key = user32.VK_MENU
+	KeyMenu              Key = user32.VK_MENU
+	KeyPause             Key = user32.VK_PAUSE
+	KeyCapital           Key = user32.VK_CAPITAL
+	KeyKana              Key = user32.VK_KANA
+	KeyHangul            Key = user32.VK_HANGUL
+	KeyJunja             Key = user32.VK_JUNJA
+	KeyFinal             Key = user32.VK_FINAL
+	KeyHanja             Key = user32.VK_HANJA
+	KeyKanji             Key = user32.VK_KANJI
+	KeyEscape            Key = user32.VK_ESCAPE
+	KeyConvert           Key = user32.VK_CONVERT
+	KeyNonconvert        Key = user32.VK_NONCONVERT
+	KeyAccept            Key = user32.VK_ACCEPT
+	KeyModeChange        Key = user32.VK_MODECHANGE
+	KeySpace             Key = user32.VK_SPACE
+	KeyPrior             Key = user32.VK_PRIOR
+	KeyNext              Key = user32.VK_NEXT
+	KeyEnd               Key = user32.VK_END
+	KeyHome              Key = user32.VK_HOME
+	KeyLeft              Key = user32.VK_LEFT
+	KeyUp                Key = user32.VK_UP
+	KeyRight             Key = user32.VK_RIGHT
+	KeyDown              Key = user32.VK_DOWN
+	KeySelect            Key = user32.VK_SELECT
+	KeyPrint             Key = user32.VK_PRINT
+	KeyExecute           Key = user32.VK_EXECUTE
+	KeySnapshot          Key = user32.VK_SNAPSHOT
+	KeyInsert            Key = user32.VK_INSERT
+	KeyDelete            Key = user32.VK_DELETE
+	KeyHelp              Key = user32.VK_HELP
 	Key0                 Key = 0x30
 	Key1                 Key = 0x31
 	Key2                 Key = 0x32
@@ -100,102 +98,102 @@ const (
 	KeyX                 Key = 0x58
 	KeyY                 Key = 0x59
 	KeyZ                 Key = 0x5A
-	KeyLWin              Key = win.VK_LWIN
-	KeyRWin              Key = win.VK_RWIN
-	KeyApps              Key = win.VK_APPS
-	KeySleep             Key = win.VK_SLEEP
-	KeyNumpad0           Key = win.VK_NUMPAD0
-	KeyNumpad1           Key = win.VK_NUMPAD1
-	KeyNumpad2           Key = win.VK_NUMPAD2
-	KeyNumpad3           Key = win.VK_NUMPAD3
-	KeyNumpad4           Key = win.VK_NUMPAD4
-	KeyNumpad5           Key = win.VK_NUMPAD5
-	KeyNumpad6           Key = win.VK_NUMPAD6
-	KeyNumpad7           Key = win.VK_NUMPAD7
-	KeyNumpad8           Key = win.VK_NUMPAD8
-	KeyNumpad9           Key = win.VK_NUMPAD9
-	KeyMultiply          Key = win.VK_MULTIPLY
-	KeyAdd               Key = win.VK_ADD
-	KeySeparator         Key = win.VK_SEPARATOR
-	KeySubtract          Key = win.VK_SUBTRACT
-	KeyDecimal           Key = win.VK_DECIMAL
-	KeyDivide            Key = win.VK_DIVIDE
-	KeyF1                Key = win.VK_F1
-	KeyF2                Key = win.VK_F2
-	KeyF3                Key = win.VK_F3
-	KeyF4                Key = win.VK_F4
-	KeyF5                Key = win.VK_F5
-	KeyF6                Key = win.VK_F6
-	KeyF7                Key = win.VK_F7
-	KeyF8                Key = win.VK_F8
-	KeyF9                Key = win.VK_F9
-	KeyF10               Key = win.VK_F10
-	KeyF11               Key = win.VK_F11
-	KeyF12               Key = win.VK_F12
-	KeyF13               Key = win.VK_F13
-	KeyF14               Key = win.VK_F14
-	KeyF15               Key = win.VK_F15
-	KeyF16               Key = win.VK_F16
-	KeyF17               Key = win.VK_F17
-	KeyF18               Key = win.VK_F18
-	KeyF19               Key = win.VK_F19
-	KeyF20               Key = win.VK_F20
-	KeyF21               Key = win.VK_F21
-	KeyF22               Key = win.VK_F22
-	KeyF23               Key = win.VK_F23
-	KeyF24               Key = win.VK_F24
-	KeyNumlock           Key = win.VK_NUMLOCK
-	KeyScroll            Key = win.VK_SCROLL
-	KeyLShift            Key = win.VK_LSHIFT
-	KeyRShift            Key = win.VK_RSHIFT
-	KeyLControl          Key = win.VK_LCONTROL
-	KeyRControl          Key = win.VK_RCONTROL
-	KeyLAlt              Key = win.VK_LMENU
-	KeyLMenu             Key = win.VK_LMENU
-	KeyRAlt              Key = win.VK_RMENU
-	KeyRMenu             Key = win.VK_RMENU
-	KeyBrowserBack       Key = win.VK_BROWSER_BACK
-	KeyBrowserForward    Key = win.VK_BROWSER_FORWARD
-	KeyBrowserRefresh    Key = win.VK_BROWSER_REFRESH
-	KeyBrowserStop       Key = win.VK_BROWSER_STOP
-	KeyBrowserSearch     Key = win.VK_BROWSER_SEARCH
-	KeyBrowserFavorites  Key = win.VK_BROWSER_FAVORITES
-	KeyBrowserHome       Key = win.VK_BROWSER_HOME
-	KeyVolumeMute        Key = win.VK_VOLUME_MUTE
-	KeyVolumeDown        Key = win.VK_VOLUME_DOWN
-	KeyVolumeUp          Key = win.VK_VOLUME_UP
-	KeyMediaNextTrack    Key = win.VK_MEDIA_NEXT_TRACK
-	KeyMediaPrevTrack    Key = win.VK_MEDIA_PREV_TRACK
-	KeyMediaStop         Key = win.VK_MEDIA_STOP
-	KeyMediaPlayPause    Key = win.VK_MEDIA_PLAY_PAUSE
-	KeyLaunchMail        Key = win.VK_LAUNCH_MAIL
-	KeyLaunchMediaSelect Key = win.VK_LAUNCH_MEDIA_SELECT
-	KeyLaunchApp1        Key = win.VK_LAUNCH_APP1
-	KeyLaunchApp2        Key = win.VK_LAUNCH_APP2
-	KeyOEM1              Key = win.VK_OEM_1
-	KeyOEMPlus           Key = win.VK_OEM_PLUS
-	KeyOEMComma          Key = win.VK_OEM_COMMA
-	KeyOEMMinus          Key = win.VK_OEM_MINUS
-	KeyOEMPeriod         Key = win.VK_OEM_PERIOD
-	KeyOEM2              Key = win.VK_OEM_2
-	KeyOEM3              Key = win.VK_OEM_3
-	KeyOEM4              Key = win.VK_OEM_4
-	KeyOEM5              Key = win.VK_OEM_5
-	KeyOEM6              Key = win.VK_OEM_6
-	KeyOEM7              Key = win.VK_OEM_7
-	KeyOEM8              Key = win.VK_OEM_8
-	KeyOEM102            Key = win.VK_OEM_102
-	KeyProcessKey        Key = win.VK_PROCESSKEY
-	KeyPacket            Key = win.VK_PACKET
-	KeyAttn              Key = win.VK_ATTN
-	KeyCRSel             Key = win.VK_CRSEL
-	KeyEXSel             Key = win.VK_EXSEL
-	KeyErEOF             Key = win.VK_EREOF
-	KeyPlay              Key = win.VK_PLAY
-	KeyZoom              Key = win.VK_ZOOM
-	KeyNoName            Key = win.VK_NONAME
-	KeyPA1               Key = win.VK_PA1
-	KeyOEMClear          Key = win.VK_OEM_CLEAR
+	KeyLWin              Key = user32.VK_LWIN
+	KeyRWin              Key = user32.VK_RWIN
+	KeyApps              Key = user32.VK_APPS
+	KeySleep             Key = user32.VK_SLEEP
+	KeyNumpad0           Key = user32.VK_NUMPAD0
+	KeyNumpad1           Key = user32.VK_NUMPAD1
+	KeyNumpad2           Key = user32.VK_NUMPAD2
+	KeyNumpad3           Key = user32.VK_NUMPAD3
+	KeyNumpad4           Key = user32.VK_NUMPAD4
+	KeyNumpad5           Key = user32.VK_NUMPAD5
+	KeyNumpad6           Key = user32.VK_NUMPAD6
+	KeyNumpad7           Key = user32.VK_NUMPAD7
+	KeyNumpad8           Key = user32.VK_NUMPAD8
+	KeyNumpad9           Key = user32.VK_NUMPAD9
+	KeyMultiply          Key = user32.VK_MULTIPLY
+	KeyAdd               Key = user32.VK_ADD
+	KeySeparator         Key = user32.VK_SEPARATOR
+	KeySubtract          Key = user32.VK_SUBTRACT
+	KeyDecimal           Key = user32.VK_DECIMAL
+	KeyDivide            Key = user32.VK_DIVIDE
+	KeyF1                Key = user32.VK_F1
+	KeyF2                Key = user32.VK_F2
+	KeyF3                Key = user32.VK_F3
+	KeyF4                Key = user32.VK_F4
+	KeyF5                Key = user32.VK_F5
+	KeyF6                Key = user32.VK_F6
+	KeyF7                Key = user32.VK_F7
+	KeyF8                Key = user32.VK_F8
+	KeyF9                Key = user32.VK_F9
+	KeyF10               Key = user32.VK_F10
+	KeyF11               Key = user32.VK_F11
+	KeyF12               Key = user32.VK_F12
+	KeyF13               Key = user32.VK_F13
+	KeyF14               Key = user32.VK_F14
+	KeyF15               Key = user32.VK_F15
+	KeyF16               Key = user32.VK_F16
+	KeyF17               Key = user32.VK_F17
+	KeyF18               Key = user32.VK_F18
+	KeyF19               Key = user32.VK_F19
+	KeyF20               Key = user32.VK_F20
+	KeyF21               Key = user32.VK_F21
+	KeyF22               Key = user32.VK_F22
+	KeyF23               Key = user32.VK_F23
+	KeyF24               Key = user32.VK_F24
+	KeyNumlock           Key = user32.VK_NUMLOCK
+	KeyScroll            Key = user32.VK_SCROLL
+	KeyLShift            Key = user32.VK_LSHIFT
+	KeyRShift            Key = user32.VK_RSHIFT
+	KeyLControl          Key = user32.VK_LCONTROL
+	KeyRControl          Key = user32.VK_RCONTROL
+	KeyLAlt              Key = user32.VK_LMENU
+	KeyLMenu             Key = user32.VK_LMENU
+	KeyRAlt              Key = user32.VK_RMENU
+	KeyRMenu             Key = user32.VK_RMENU
+	KeyBrowserBack       Key = user32.VK_BROWSER_BACK
+	KeyBrowserForward    Key = user32.VK_BROWSER_FORWARD
+	KeyBrowserRefresh    Key = user32.VK_BROWSER_REFRESH
+	KeyBrowserStop       Key = user32.VK_BROWSER_STOP
+	KeyBrowserSearch     Key = user32.VK_BROWSER_SEARCH
+	KeyBrowserFavorites  Key = user32.VK_BROWSER_FAVORITES
+	KeyBrowserHome       Key = user32.VK_BROWSER_HOME
+	KeyVolumeMute        Key = user32.VK_VOLUME_MUTE
+	KeyVolumeDown        Key = user32.VK_VOLUME_DOWN
+	KeyVolumeUp          Key = user32.VK_VOLUME_UP
+	KeyMediaNextTrack    Key = user32.VK_MEDIA_NEXT_TRACK
+	KeyMediaPrevTrack    Key = user32.VK_MEDIA_PREV_TRACK
+	KeyMediaStop         Key = user32.VK_MEDIA_STOP
+	KeyMediaPlayPause    Key = user32.VK_MEDIA_PLAY_PAUSE
+	KeyLaunchMail        Key = user32.VK_LAUNCH_MAIL
+	KeyLaunchMediaSelect Key = user32.VK_LAUNCH_MEDIA_SELECT
+	KeyLaunchApp1        Key = user32.VK_LAUNCH_APP1
+	KeyLaunchApp2        Key = user32.VK_LAUNCH_APP2
+	KeyOEM1              Key = user32.VK_OEM_1
+	KeyOEMPlus           Key = user32.VK_OEM_PLUS
+	KeyOEMComma          Key = user32.VK_OEM_COMMA
+	KeyOEMMinus          Key = user32.VK_OEM_MINUS
+	KeyOEMPeriod         Key = user32.VK_OEM_PERIOD
+	KeyOEM2              Key = user32.VK_OEM_2
+	KeyOEM3              Key = user32.VK_OEM_3
+	KeyOEM4              Key = user32.VK_OEM_4
+	KeyOEM5              Key = user32.VK_OEM_5
+	KeyOEM6              Key = user32.VK_OEM_6
+	KeyOEM7              Key = user32.VK_OEM_7
+	KeyOEM8              Key = user32.VK_OEM_8
+	KeyOEM102            Key = user32.VK_OEM_102
+	KeyProcessKey        Key = user32.VK_PROCESSKEY
+	KeyPacket            Key = user32.VK_PACKET
+	KeyAttn              Key = user32.VK_ATTN
+	KeyCRSel             Key = user32.VK_CRSEL
+	KeyEXSel             Key = user32.VK_EXSEL
+	KeyErEOF             Key = user32.VK_EREOF
+	KeyPlay              Key = user32.VK_PLAY
+	KeyZoom              Key = user32.VK_ZOOM
+	KeyNoName            Key = user32.VK_NONAME
+	KeyPA1               Key = user32.VK_PA1
+	KeyOEMClear          Key = user32.VK_OEM_CLEAR
 )
 
 var key2string = map[Key]string{
@@ -430,13 +428,13 @@ func (s Shortcut) String() string {
 }
 
 func AltDown() bool {
-	return win.GetKeyState(int32(KeyAlt))>>15 != 0
+	return user32.GetKeyState(int32(KeyAlt))>>15 != 0
 }
 
 func ControlDown() bool {
-	return win.GetKeyState(int32(KeyControl))>>15 != 0
+	return user32.GetKeyState(int32(KeyControl))>>15 != 0
 }
 
 func ShiftDown() bool {
-	return win.GetKeyState(int32(KeyShift))>>15 != 0
+	return user32.GetKeyState(int32(KeyShift))>>15 != 0
 }

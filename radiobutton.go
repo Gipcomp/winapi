@@ -4,10 +4,12 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 type RadioButtonGroup struct {
@@ -45,7 +47,7 @@ func NewRadioButton(parent Container) (*RadioButton, error) {
 	}
 	var groupBit uint32
 	if rb.group == nil {
-		groupBit = win.WS_GROUP
+		groupBit = user32.WS_GROUP
 		rb.group = new(RadioButtonGroup)
 	}
 
@@ -53,7 +55,7 @@ func NewRadioButton(parent Container) (*RadioButton, error) {
 		rb,
 		parent,
 		"BUTTON",
-		groupBit|win.WS_TABSTOP|win.WS_VISIBLE|win.BS_AUTORADIOBUTTON,
+		groupBit|user32.WS_TABSTOP|user32.WS_VISIBLE|user32.BS_AUTORADIOBUTTON,
 		0); err != nil {
 		return nil, err
 	}
@@ -94,11 +96,11 @@ func (rb *RadioButton) radioButton() *RadioButton {
 }
 
 func (rb *RadioButton) TextOnLeftSide() bool {
-	return rb.hasStyleBits(win.BS_LEFTTEXT)
+	return rb.hasStyleBits(user32.BS_LEFTTEXT)
 }
 
 func (rb *RadioButton) SetTextOnLeftSide(textLeft bool) error {
-	return rb.ensureStyleBits(win.BS_LEFTTEXT, textLeft)
+	return rb.ensureStyleBits(user32.BS_LEFTTEXT, textLeft)
 }
 
 func (rb *RadioButton) Group() *RadioButtonGroup {
@@ -113,11 +115,11 @@ func (rb *RadioButton) SetValue(value interface{}) {
 	rb.value = value
 }
 
-func (rb *RadioButton) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (rb *RadioButton) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_COMMAND:
+	case user32.WM_COMMAND:
 		switch win.HIWORD(uint32(wParam)) {
-		case win.BN_CLICKED:
+		case user32.BN_CLICKED:
 			prevChecked := rb.group.checkedButton
 			rb.group.checkedButton = rb
 

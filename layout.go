@@ -4,12 +4,13 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"sync"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
 )
 
 func createLayoutItemForWidget(widget Widget) LayoutItem {
@@ -299,7 +300,7 @@ func applyLayoutResults(results []LayoutResult, stopwatch *stopwatch) error {
 			continue
 		}
 
-		hdwp := win.BeginDeferWindowPos(int32(len(result.items)))
+		hdwp := user32.BeginDeferWindowPos(int32(len(result.items)))
 		if hdwp == 0 {
 			return lastError("BeginDeferWindowPos")
 		}
@@ -323,8 +324,8 @@ func applyLayoutResults(results []LayoutResult, stopwatch *stopwatch) error {
 				if form == nil {
 					if form = window.Form(); form != nil {
 						defer func() {
-							hwndFocused := win.GetFocus()
-							hwndForm := win.GetAncestor(hwndFocused, win.GA_ROOT)
+							hwndFocused := user32.GetFocus()
+							hwndForm := user32.GetAncestor(hwndFocused, user32.GA_ROOT)
 							activeForm, _ := windowFromHandle(hwndForm).(Form)
 
 							if hwndFocused == 0 || form.Handle() == hwndFocused || activeForm != window.Form() {
@@ -358,7 +359,7 @@ func applyLayoutResults(results []LayoutResult, stopwatch *stopwatch) error {
 					}
 				}
 
-				if hdwp = win.DeferWindowPos(
+				if hdwp = user32.DeferWindowPos(
 					hdwp,
 					ri.Item.Handle(),
 					0,
@@ -366,7 +367,7 @@ func applyLayoutResults(results []LayoutResult, stopwatch *stopwatch) error {
 					int32(ri.Bounds.Y),
 					int32(ri.Bounds.Width),
 					int32(ri.Bounds.Height),
-					win.SWP_NOACTIVATE|win.SWP_NOOWNERZORDER|win.SWP_NOZORDER); hdwp == 0 {
+					user32.SWP_NOACTIVATE|user32.SWP_NOOWNERZORDER|user32.SWP_NOZORDER); hdwp == 0 {
 
 					return lastError("DeferWindowPos")
 				}
@@ -379,7 +380,7 @@ func applyLayoutResults(results []LayoutResult, stopwatch *stopwatch) error {
 			}
 		}
 
-		if !win.EndDeferWindowPos(hdwp) {
+		if !user32.EndDeferWindowPos(hdwp) {
 			return lastError("EndDeferWindowPos")
 		}
 	}
@@ -562,17 +563,17 @@ func (ctx *LayoutContext) DPI() int {
 	return ctx.dpi
 }
 
-func newLayoutContext(handle win.HWND) *LayoutContext {
+func newLayoutContext(handle handle.HWND) *LayoutContext {
 	return &LayoutContext{
 		layoutItem2MinSizeEffective: make(map[LayoutItem]Size),
-		dpi:                         int(win.GetDpiForWindow(handle)),
+		dpi:                         int(user32.GetDpiForWindow(handle)),
 	}
 }
 
 type LayoutItem interface {
 	AsLayoutItemBase() *LayoutItemBase
 	Context() *LayoutContext
-	Handle() win.HWND
+	Handle() handle.HWND
 	Geometry() *Geometry
 	Parent() ContainerLayoutItem
 	Visible() bool
@@ -591,12 +592,12 @@ type ContainerLayoutItem interface {
 
 	PerformLayout() []LayoutResultItem
 	Children() []LayoutItem
-	containsHandle(handle win.HWND) bool
+	containsHandle(handle handle.HWND) bool
 }
 
 type LayoutItemBase struct {
 	ctx      *LayoutContext
-	handle   win.HWND
+	handle   handle.HWND
 	geometry Geometry
 	parent   ContainerLayoutItem
 	visible  bool
@@ -610,7 +611,7 @@ func (lib *LayoutItemBase) Context() *LayoutContext {
 	return lib.ctx
 }
 
-func (lib *LayoutItemBase) Handle() win.HWND {
+func (lib *LayoutItemBase) Handle() handle.HWND {
 	return lib.handle
 }
 
@@ -690,7 +691,7 @@ func (clib *ContainerLayoutItemBase) SetChildren(children []LayoutItem) {
 	clib.children = children
 }
 
-func (clib *ContainerLayoutItemBase) containsHandle(handle win.HWND) bool {
+func (clib *ContainerLayoutItemBase) containsHandle(handle handle.HWND) bool {
 	for _, item := range clib.children {
 		if item.Handle() == handle {
 			return true

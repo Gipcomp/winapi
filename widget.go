@@ -4,10 +4,12 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/user32"
 )
 
 // LayoutFlags specify how a Widget wants to be treated when used with a Layout.
@@ -107,14 +109,14 @@ func InitWidget(widget Widget, parent Window, className string, style, exStyle u
 		return newError("parent cannot be nil")
 	}
 
-	if err := InitWindow(widget, parent, className, style|win.WS_CHILD, exStyle); err != nil {
+	if err := InitWindow(widget, parent, className, style|user32.WS_CHILD, exStyle); err != nil {
 		return err
 	}
 
 	if container, ok := parent.(Container); ok {
 		if container.Children() == nil {
 			// Required by parents like MainWindow and GroupBox.
-			if win.SetParent(widget.Handle(), container.Handle()) == 0 {
+			if user32.SetParent(widget.Handle(), container.Handle()) == 0 {
 				return lastError("SetParent")
 			}
 		} else {
@@ -158,7 +160,7 @@ func (wb *WidgetBase) Dispose() {
 		return
 	}
 
-	if wb.parent != nil && win.GetParent(wb.hWnd) == wb.parent.Handle() {
+	if wb.parent != nil && user32.GetParent(wb.hWnd) == wb.parent.Handle() {
 		wb.SetParent(nil)
 	}
 
@@ -191,7 +193,7 @@ func (wb *WidgetBase) BoundsPixels() Rectangle {
 
 	if wb.parent != nil {
 		p := b.Location().toPOINT()
-		if !win.ScreenToClient(wb.parent.Handle(), &p) {
+		if !user32.ScreenToClient(wb.parent.Handle(), &p) {
 			newError("ScreenToClient failed")
 			return Rectangle{}
 		}
@@ -301,7 +303,7 @@ func (wb *WidgetBase) SetParent(parent Container) (err error) {
 		return nil
 	}
 
-	style := uint32(win.GetWindowLong(wb.hWnd, win.GWL_STYLE))
+	style := uint32(user32.GetWindowLong(wb.hWnd, user32.GWL_STYLE))
 	if style == 0 {
 		return lastError("GetWindowLong")
 	}
@@ -309,43 +311,43 @@ func (wb *WidgetBase) SetParent(parent Container) (err error) {
 	if parent == nil {
 		wb.SetVisible(false)
 
-		style &^= win.WS_CHILD
-		style |= win.WS_POPUP
+		style &^= user32.WS_CHILD
+		style |= user32.WS_POPUP
 
-		if win.SetParent(wb.hWnd, 0) == 0 {
+		if user32.SetParent(wb.hWnd, 0) == 0 {
 			return lastError("SetParent")
 		}
-		win.SetLastError(0)
-		if win.SetWindowLong(wb.hWnd, win.GWL_STYLE, int32(style)) == 0 {
+		kernel32.SetLastError(0)
+		if user32.SetWindowLong(wb.hWnd, user32.GWL_STYLE, int32(style)) == 0 {
 			return lastError("SetWindowLong")
 		}
 	} else {
-		style |= win.WS_CHILD
-		style &^= win.WS_POPUP
+		style |= user32.WS_CHILD
+		style &^= user32.WS_POPUP
 
-		win.SetLastError(0)
-		if win.SetWindowLong(wb.hWnd, win.GWL_STYLE, int32(style)) == 0 {
+		kernel32.SetLastError(0)
+		if user32.SetWindowLong(wb.hWnd, user32.GWL_STYLE, int32(style)) == 0 {
 			return lastError("SetWindowLong")
 		}
-		if win.SetParent(wb.hWnd, parent.Handle()) == 0 {
+		if user32.SetParent(wb.hWnd, parent.Handle()) == 0 {
 			return lastError("SetParent")
 		}
 
 		if cb := parent.AsContainerBase(); cb != nil {
-			win.SetWindowLong(wb.hWnd, win.GWL_ID, cb.NextChildID())
+			user32.SetWindowLong(wb.hWnd, user32.GWL_ID, cb.NextChildID())
 		}
 	}
 
 	b := wb.BoundsPixels()
 
-	if !win.SetWindowPos(
+	if !user32.SetWindowPos(
 		wb.hWnd,
-		win.HWND_BOTTOM,
+		user32.HWND_BOTTOM,
 		int32(b.X),
 		int32(b.Y),
 		int32(b.Width),
 		int32(b.Height),
-		win.SWP_FRAMECHANGED) {
+		user32.SWP_FRAMECHANGED) {
 
 		return lastError("SetWindowPos")
 	}
@@ -380,7 +382,7 @@ func (wb *WidgetBase) SetParent(parent Container) (err error) {
 }
 
 func (wb *WidgetBase) ForEachAncestor(f func(window Window) bool) {
-	hwnd := win.GetParent(wb.hWnd)
+	hwnd := user32.GetParent(wb.hWnd)
 
 	for hwnd != 0 {
 		if window := windowFromHandle(hwnd); window != nil {
@@ -389,7 +391,7 @@ func (wb *WidgetBase) ForEachAncestor(f func(window Window) bool) {
 			}
 		}
 
-		hwnd = win.GetParent(hwnd)
+		hwnd = user32.GetParent(hwnd)
 	}
 }
 
@@ -448,17 +450,17 @@ func (wb *WidgetBase) invalidateBorderInParent() {
 
 		hwnd := wb.parent.Handle()
 
-		rc := win.RECT{Left: b.Left - s, Top: b.Top - s, Right: b.Left, Bottom: b.Bottom + s}
-		win.InvalidateRect(hwnd, &rc, true)
+		rc := gdi32.RECT{Left: b.Left - s, Top: b.Top - s, Right: b.Left, Bottom: b.Bottom + s}
+		user32.InvalidateRect(hwnd, &rc, true)
 
-		rc = win.RECT{Left: b.Right, Top: b.Top - s, Right: b.Right + s, Bottom: b.Bottom + s}
-		win.InvalidateRect(hwnd, &rc, true)
+		rc = gdi32.RECT{Left: b.Right, Top: b.Top - s, Right: b.Right + s, Bottom: b.Bottom + s}
+		user32.InvalidateRect(hwnd, &rc, true)
 
-		rc = win.RECT{Left: b.Left, Top: b.Top - s, Right: b.Right, Bottom: b.Top}
-		win.InvalidateRect(hwnd, &rc, true)
+		rc = gdi32.RECT{Left: b.Left, Top: b.Top - s, Right: b.Right, Bottom: b.Top}
+		user32.InvalidateRect(hwnd, &rc, true)
 
-		rc = win.RECT{Left: b.Left, Top: b.Bottom, Right: b.Right, Bottom: b.Bottom + s}
-		win.InvalidateRect(hwnd, &rc, true)
+		rc = gdi32.RECT{Left: b.Left, Top: b.Bottom, Right: b.Right, Bottom: b.Bottom + s}
+		user32.InvalidateRect(hwnd, &rc, true)
 	}
 }
 
@@ -503,7 +505,7 @@ func ancestor(w Widget) Form {
 		return nil
 	}
 
-	hWndRoot := win.GetAncestor(w.Handle(), win.GA_ROOT)
+	hWndRoot := user32.GetAncestor(w.Handle(), user32.GA_ROOT)
 
 	rw, _ := windowFromHandle(hWndRoot).(Form)
 	return rw

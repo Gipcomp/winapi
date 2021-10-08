@@ -4,13 +4,15 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 const groupBoxWindowClass = `\o/ Walk_GroupBox_Class \o/`
@@ -23,7 +25,7 @@ func init() {
 
 type GroupBox struct {
 	WidgetBase
-	hWndGroupBox          win.HWND
+	hWndGroupBox          handle.HWND
 	checkBox              *CheckBox
 	composite             *Composite
 	headerHeight          int // in native pixels
@@ -37,8 +39,8 @@ func NewGroupBox(parent Container) (*GroupBox, error) {
 		gb,
 		parent,
 		groupBoxWindowClass,
-		win.WS_VISIBLE,
-		win.WS_EX_CONTROLPARENT); err != nil {
+		user32.WS_VISIBLE,
+		user32.WS_EX_CONTROLPARENT); err != nil {
 		return nil, err
 	}
 
@@ -48,15 +50,18 @@ func NewGroupBox(parent Container) (*GroupBox, error) {
 			gb.Dispose()
 		}
 	}()
-
-	gb.hWndGroupBox = win.CreateWindowEx(
-		0, syscall.StringToUTF16Ptr("BUTTON"), nil,
-		win.WS_CHILD|win.WS_VISIBLE|win.BS_GROUPBOX,
+	strPtr, err2 := syscall.UTF16PtrFromString("BUTTON")
+	if err2 != nil {
+		newError(err2.Error())
+	}
+	gb.hWndGroupBox = user32.CreateWindowEx(
+		0, strPtr, nil,
+		user32.WS_CHILD|user32.WS_VISIBLE|user32.BS_GROUPBOX,
 		0, 0, 80, 24, gb.hWnd, 0, 0, nil)
 	if gb.hWndGroupBox == 0 {
 		return nil, lastError("CreateWindowEx(BUTTON)")
 	}
-	win.SetWindowLong(gb.hWndGroupBox, win.GWL_ID, 1)
+	user32.SetWindowLong(gb.hWndGroupBox, user32.GWL_ID, 1)
 
 	gb.applyFont(gb.Font())
 	gb.updateHeaderHeight()
@@ -67,7 +72,7 @@ func NewGroupBox(parent Container) (*GroupBox, error) {
 	if err != nil {
 		return nil, err
 	}
-	win.SetWindowLong(gb.checkBox.hWnd, win.GWL_ID, 2)
+	user32.SetWindowLong(gb.checkBox.hWnd, user32.GWL_ID, 2)
 
 	gb.SetCheckable(false)
 	gb.checkBox.SetChecked(true)
@@ -82,10 +87,10 @@ func NewGroupBox(parent Container) (*GroupBox, error) {
 	if err != nil {
 		return nil, err
 	}
-	win.SetWindowLong(gb.composite.hWnd, win.GWL_ID, 3)
+	user32.SetWindowLong(gb.composite.hWnd, user32.GWL_ID, 3)
 	gb.composite.name = "composite"
 
-	win.SetWindowPos(gb.checkBox.hWnd, win.HWND_TOP, 0, 0, 0, 0, win.SWP_NOMOVE|win.SWP_NOSIZE)
+	user32.SetWindowPos(gb.checkBox.hWnd, user32.HWND_TOP, 0, 0, 0, 0, user32.SWP_NOMOVE|user32.SWP_NOSIZE)
 
 	gb.SetBackground(NullBrush())
 
@@ -308,39 +313,39 @@ func (gb *GroupBox) MouseUp() *MouseEvent {
 	return gb.composite.MouseUp()
 }
 
-func (gb *GroupBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (gb *GroupBox) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	if gb.composite != nil {
 		switch msg {
-		case win.WM_CTLCOLORSTATIC:
+		case user32.WM_CTLCOLORSTATIC:
 			if hBrush := gb.handleWMCTLCOLOR(wParam, lParam); hBrush != 0 {
 				return hBrush
 			}
 
-		case win.WM_COMMAND:
-			hwndSrc := win.GetDlgItem(gb.hWnd, int32(win.LOWORD(uint32(wParam))))
+		case user32.WM_COMMAND:
+			hwndSrc := user32.GetDlgItem(gb.hWnd, int32(win.LOWORD(uint32(wParam))))
 
 			if window := windowFromHandle(hwndSrc); window != nil {
 				window.WndProc(hwnd, msg, wParam, lParam)
 			}
 
-		case win.WM_NOTIFY:
+		case user32.WM_NOTIFY:
 			gb.composite.WndProc(hwnd, msg, wParam, lParam)
 
-		case win.WM_SETTEXT:
+		case user32.WM_SETTEXT:
 			gb.titleChangedPublisher.Publish()
 
-		case win.WM_PAINT:
-			win.UpdateWindow(gb.checkBox.hWnd)
+		case user32.WM_PAINT:
+			user32.UpdateWindow(gb.checkBox.hWnd)
 
-		case win.WM_WINDOWPOSCHANGED:
-			wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
+		case user32.WM_WINDOWPOSCHANGED:
+			wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
 
-			if wp.Flags&win.SWP_NOSIZE != 0 {
+			if wp.Flags&user32.SWP_NOSIZE != 0 {
 				break
 			}
 
 			wbcb := gb.WidgetBase.ClientBoundsPixels()
-			if !win.MoveWindow(
+			if !user32.MoveWindow(
 				gb.hWndGroupBox,
 				int32(wbcb.X),
 				int32(wbcb.Y),

@@ -4,15 +4,17 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
-)
 
-import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/comctl32"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 // StatusBar is a widget that displays status messages.
@@ -29,7 +31,7 @@ func NewStatusBar(parent Container) (*StatusBar, error) {
 		sb,
 		parent,
 		"msctls_statusbar32",
-		win.SBARS_SIZEGRIP|win.SBARS_TOOLTIPS,
+		commctrl.SBARS_SIZEGRIP|commctrl.SBARS_TOOLTIPS,
 		0); err != nil {
 		return nil, err
 	}
@@ -94,7 +96,7 @@ func (sb *StatusBar) updateParts() error {
 	}
 
 	if 0 == sb.SendMessage(
-		win.SB_SETPARTS,
+		commctrl.SB_SETPARTS,
 		uintptr(len(items)),
 		uintptr(unsafe.Pointer(rep))) {
 
@@ -104,14 +106,14 @@ func (sb *StatusBar) updateParts() error {
 	return nil
 }
 
-func (sb *StatusBar) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (sb *StatusBar) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_NOTIFY:
-		nmhdr := (*win.NMHDR)(unsafe.Pointer(lParam))
+	case user32.WM_NOTIFY:
+		nmhdr := (*user32.NMHDR)(unsafe.Pointer(lParam))
 
 		switch nmhdr.Code {
-		case win.NM_CLICK:
-			lpnm := (*win.NMMOUSE)(unsafe.Pointer(lParam))
+		case comctl32.NM_CLICK:
+			lpnm := (*commctrl.NMMOUSE)(unsafe.Pointer(lParam))
 			if n := int(lpnm.DwItemSpec); n >= 0 && n < sb.items.Len() {
 				sb.items.At(n).raiseClicked()
 			}
@@ -278,13 +280,13 @@ func (sbi *StatusBarItem) update(index int) error {
 }
 
 func (sbi *StatusBarItem) updateIcon(index int) error {
-	var hIcon win.HICON
+	var hIcon user32.HICON
 	if sbi.icon != nil {
 		hIcon = sbi.icon.handleForDPI(sbi.sb.DPI())
 	}
 
 	if 0 == sbi.sb.SendMessage(
-		win.SB_SETICON,
+		commctrl.SB_SETICON,
 		uintptr(index),
 		uintptr(hIcon)) {
 
@@ -301,7 +303,7 @@ func (sbi *StatusBarItem) updateText(index int) error {
 	}
 
 	if 0 == sbi.sb.SendMessage(
-		win.SB_SETTEXT,
+		commctrl.SB_SETTEXT,
 		uintptr(win.MAKEWORD(byte(index), 0)),
 		uintptr(unsafe.Pointer(utf16))) {
 
@@ -318,7 +320,7 @@ func (sbi *StatusBarItem) updateToolTipText(index int) error {
 	}
 
 	sbi.sb.SendMessage(
-		win.SB_SETTIPTEXT,
+		commctrl.SB_SETTIPTEXT,
 		uintptr(index),
 		uintptr(unsafe.Pointer(utf16)))
 

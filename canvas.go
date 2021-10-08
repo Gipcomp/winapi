@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"log"
@@ -12,50 +12,53 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 // DrawText format flags
 type DrawTextFormat uint
 
 const (
-	TextTop                  DrawTextFormat = win.DT_TOP
-	TextLeft                 DrawTextFormat = win.DT_LEFT
-	TextCenter               DrawTextFormat = win.DT_CENTER
-	TextRight                DrawTextFormat = win.DT_RIGHT
-	TextVCenter              DrawTextFormat = win.DT_VCENTER
-	TextBottom               DrawTextFormat = win.DT_BOTTOM
-	TextWordbreak            DrawTextFormat = win.DT_WORDBREAK
-	TextSingleLine           DrawTextFormat = win.DT_SINGLELINE
-	TextExpandTabs           DrawTextFormat = win.DT_EXPANDTABS
-	TextTabstop              DrawTextFormat = win.DT_TABSTOP
-	TextNoClip               DrawTextFormat = win.DT_NOCLIP
-	TextExternalLeading      DrawTextFormat = win.DT_EXTERNALLEADING
-	TextCalcRect             DrawTextFormat = win.DT_CALCRECT
-	TextNoPrefix             DrawTextFormat = win.DT_NOPREFIX
-	TextInternal             DrawTextFormat = win.DT_INTERNAL
-	TextEditControl          DrawTextFormat = win.DT_EDITCONTROL
-	TextPathEllipsis         DrawTextFormat = win.DT_PATH_ELLIPSIS
-	TextEndEllipsis          DrawTextFormat = win.DT_END_ELLIPSIS
-	TextModifyString         DrawTextFormat = win.DT_MODIFYSTRING
-	TextRTLReading           DrawTextFormat = win.DT_RTLREADING
-	TextWordEllipsis         DrawTextFormat = win.DT_WORD_ELLIPSIS
-	TextNoFullWidthCharBreak DrawTextFormat = win.DT_NOFULLWIDTHCHARBREAK
-	TextHidePrefix           DrawTextFormat = win.DT_HIDEPREFIX
-	TextPrefixOnly           DrawTextFormat = win.DT_PREFIXONLY
+	TextTop                  DrawTextFormat = user32.DT_TOP
+	TextLeft                 DrawTextFormat = user32.DT_LEFT
+	TextCenter               DrawTextFormat = user32.DT_CENTER
+	TextRight                DrawTextFormat = user32.DT_RIGHT
+	TextVCenter              DrawTextFormat = user32.DT_VCENTER
+	TextBottom               DrawTextFormat = user32.DT_BOTTOM
+	TextWordbreak            DrawTextFormat = user32.DT_WORDBREAK
+	TextSingleLine           DrawTextFormat = user32.DT_SINGLELINE
+	TextExpandTabs           DrawTextFormat = user32.DT_EXPANDTABS
+	TextTabstop              DrawTextFormat = user32.DT_TABSTOP
+	TextNoClip               DrawTextFormat = user32.DT_NOCLIP
+	TextExternalLeading      DrawTextFormat = user32.DT_EXTERNALLEADING
+	TextCalcRect             DrawTextFormat = user32.DT_CALCRECT
+	TextNoPrefix             DrawTextFormat = user32.DT_NOPREFIX
+	TextInternal             DrawTextFormat = user32.DT_INTERNAL
+	TextEditControl          DrawTextFormat = user32.DT_EDITCONTROL
+	TextPathEllipsis         DrawTextFormat = user32.DT_PATH_ELLIPSIS
+	TextEndEllipsis          DrawTextFormat = user32.DT_END_ELLIPSIS
+	TextModifyString         DrawTextFormat = user32.DT_MODIFYSTRING
+	TextRTLReading           DrawTextFormat = user32.DT_RTLREADING
+	TextWordEllipsis         DrawTextFormat = user32.DT_WORD_ELLIPSIS
+	TextNoFullWidthCharBreak DrawTextFormat = user32.DT_NOFULLWIDTHCHARBREAK
+	TextHidePrefix           DrawTextFormat = user32.DT_HIDEPREFIX
+	TextPrefixOnly           DrawTextFormat = user32.DT_PREFIXONLY
 )
 
 var gM *uint16
 
 func init() {
 	AppendToWalkInit(func() {
-		gM = syscall.StringToUTF16Ptr("gM")
+		gM, _ = syscall.UTF16PtrFromString("gM")
 	})
 }
 
 type Canvas struct {
-	hdc                 win.HDC
-	hBmpStock           win.HBITMAP
+	hdc                 gdi32.HDC
+	hBmpStock           gdi32.HBITMAP
 	window              Window
 	dpi                 int
 	bitmap              *Bitmap
@@ -67,7 +70,7 @@ type Canvas struct {
 func NewCanvasFromImage(image Image) (*Canvas, error) {
 	switch img := image.(type) {
 	case *Bitmap:
-		hdc := win.CreateCompatibleDC(0)
+		hdc := gdi32.CreateCompatibleDC(0)
 		if hdc == 0 {
 			return nil, newError("CreateCompatibleDC failed")
 		}
@@ -75,12 +78,12 @@ func NewCanvasFromImage(image Image) (*Canvas, error) {
 
 		defer func() {
 			if !succeeded {
-				win.DeleteDC(hdc)
+				gdi32.DeleteDC(hdc)
 			}
 		}()
 
-		var hBmpStock win.HBITMAP
-		if hBmpStock = win.HBITMAP(win.SelectObject(hdc, win.HGDIOBJ(img.hBmp))); hBmpStock == 0 {
+		var hBmpStock gdi32.HBITMAP
+		if hBmpStock = gdi32.HBITMAP(gdi32.SelectObject(hdc, gdi32.HGDIOBJ(img.hBmp))); hBmpStock == 0 {
 			return nil, newError("SelectObject failed")
 		}
 
@@ -103,7 +106,7 @@ func NewCanvasFromImage(image Image) (*Canvas, error) {
 }
 
 func newCanvasFromWindow(window Window) (*Canvas, error) {
-	hdc := win.GetDC(window.Handle())
+	hdc := user32.GetDC(window.Handle())
 	if hdc == 0 {
 		return nil, newError("GetDC failed")
 	}
@@ -111,7 +114,7 @@ func newCanvasFromWindow(window Window) (*Canvas, error) {
 	return (&Canvas{hdc: hdc, window: window}).init()
 }
 
-func newCanvasFromHDC(hdc win.HDC) (*Canvas, error) {
+func newCanvasFromHDC(hdc gdi32.HDC) (*Canvas, error) {
 	if hdc == 0 {
 		return nil, newError("invalid hdc")
 	}
@@ -124,16 +127,16 @@ func (c *Canvas) init() (*Canvas, error) {
 		c.dpi = dpiForHDC(c.hdc)
 	}
 
-	if win.SetBkMode(c.hdc, win.TRANSPARENT) == 0 {
+	if gdi32.SetBkMode(c.hdc, gdi32.TRANSPARENT) == 0 {
 		return nil, newError("SetBkMode failed")
 	}
 
-	switch win.SetStretchBltMode(c.hdc, win.HALFTONE) {
-	case 0, win.ERROR_INVALID_PARAMETER:
+	switch gdi32.SetStretchBltMode(c.hdc, gdi32.HALFTONE) {
+	case 0, kernel32.ERROR_INVALID_PARAMETER:
 		return nil, newError("SetStretchBltMode failed")
 	}
 
-	if !win.SetBrushOrgEx(c.hdc, 0, 0, nil) {
+	if !gdi32.SetBrushOrgEx(c.hdc, 0, 0, nil) {
 		return nil, newError("SetBrushOrgEx failed")
 	}
 
@@ -143,13 +146,13 @@ func (c *Canvas) init() (*Canvas, error) {
 func (c *Canvas) Dispose() {
 	if !c.doNotDispose && c.hdc != 0 {
 		if c.bitmap != nil {
-			win.SelectObject(c.hdc, win.HGDIOBJ(c.hBmpStock))
-			win.DeleteDC(c.hdc)
+			gdi32.SelectObject(c.hdc, gdi32.HGDIOBJ(c.hBmpStock))
+			gdi32.DeleteDC(c.hdc)
 			if err := c.bitmap.postProcess(); err != nil {
 				log.Printf("*Canvas.Dispose - failed to post-process bitmap: %s", err.Error())
 			}
 		} else {
-			win.ReleaseDC(c.window.Handle(), c.hdc)
+			user32.ReleaseDC(c.window.Handle(), c.hdc)
 		}
 
 		c.hdc = 0
@@ -174,35 +177,35 @@ func (c *Canvas) DPI() int {
 	return c.dpi
 }
 
-func (c *Canvas) withGdiObj(handle win.HGDIOBJ, f func() error) error {
-	oldHandle := win.SelectObject(c.hdc, handle)
+func (c *Canvas) withGdiObj(handle gdi32.HGDIOBJ, f func() error) error {
+	oldHandle := gdi32.SelectObject(c.hdc, handle)
 	if oldHandle == 0 {
 		return newError("SelectObject failed")
 	}
-	defer win.SelectObject(c.hdc, oldHandle)
+	defer gdi32.SelectObject(c.hdc, oldHandle)
 
 	return f()
 }
 
 func (c *Canvas) withBrush(brush Brush, f func() error) error {
-	return c.withGdiObj(win.HGDIOBJ(brush.handle()), f)
+	return c.withGdiObj(gdi32.HGDIOBJ(brush.handle()), f)
 }
 
 func (c *Canvas) withFontAndTextColor(font *Font, color Color, f func() error) error {
-	return c.withGdiObj(win.HGDIOBJ(font.handleForDPI(c.DPI())), func() error {
-		oldColor := win.SetTextColor(c.hdc, win.COLORREF(color))
-		if oldColor == win.CLR_INVALID {
+	return c.withGdiObj(gdi32.HGDIOBJ(font.handleForDPI(c.DPI())), func() error {
+		oldColor := gdi32.SetTextColor(c.hdc, gdi32.COLORREF(color))
+		if oldColor == gdi32.CLR_INVALID {
 			return newError("SetTextColor failed")
 		}
 		defer func() {
-			win.SetTextColor(c.hdc, oldColor)
+			gdi32.SetTextColor(c.hdc, oldColor)
 		}()
 
 		return f()
 	})
 }
 
-func (c *Canvas) HDC() win.HDC {
+func (c *Canvas) HDC() gdi32.HDC {
 	return c.hdc
 }
 
@@ -212,13 +215,13 @@ func (c *Canvas) Bounds() Rectangle {
 
 func (c *Canvas) BoundsPixels() Rectangle {
 	return Rectangle{
-		Width:  int(win.GetDeviceCaps(c.hdc, win.HORZRES)),
-		Height: int(win.GetDeviceCaps(c.hdc, win.VERTRES)),
+		Width:  int(gdi32.GetDeviceCaps(c.hdc, gdi32.HORZRES)),
+		Height: int(gdi32.GetDeviceCaps(c.hdc, gdi32.VERTRES)),
 	}
 }
 
 func (c *Canvas) withPen(pen Pen, f func() error) error {
-	return c.withGdiObj(win.HGDIOBJ(pen.handleForDPI(c.dpi)), f)
+	return c.withGdiObj(gdi32.HGDIOBJ(pen.handleForDPI(c.dpi)), f)
 }
 
 func (c *Canvas) withBrushAndPen(brush Brush, pen Pen, f func() error) error {
@@ -237,7 +240,7 @@ func (c *Canvas) ellipse(brush Brush, pen Pen, bounds Rectangle, sizeCorrection 
 // ellipsePixels draws an ellipse in native pixels.
 func (c *Canvas) ellipsePixels(brush Brush, pen Pen, bounds Rectangle, sizeCorrection int) error {
 	return c.withBrushAndPen(brush, pen, func() error {
-		if !win.Ellipse(
+		if !gdi32.Ellipse(
 			c.hdc,
 			int32(bounds.X),
 			int32(bounds.Y),
@@ -362,12 +365,12 @@ func (c *Canvas) DrawLine(pen Pen, from, to Point) error {
 
 // DrawLinePixels draws a line between two points in native pixels.
 func (c *Canvas) DrawLinePixels(pen Pen, from, to Point) error {
-	if !win.MoveToEx(c.hdc, int(from.X), int(from.Y), nil) {
+	if !gdi32.MoveToEx(c.hdc, int(from.X), int(from.Y), nil) {
 		return newError("MoveToEx failed")
 	}
 
 	return c.withPen(pen, func() error {
-		if !win.LineTo(c.hdc, int32(to.X), int32(to.Y)) {
+		if !gdi32.LineTo(c.hdc, int32(to.X), int32(to.Y)) {
 			return newError("LineTo failed")
 		}
 
@@ -385,13 +388,13 @@ func (c *Canvas) DrawPolyline(pen Pen, points []Point) error {
 
 	dpi := c.DPI()
 
-	pts := make([]win.POINT, len(points))
+	pts := make([]gdi32.POINT, len(points))
 	for i, p := range points {
 		pts[i] = PointFrom96DPI(p, dpi).toPOINT()
 	}
 
 	return c.withPen(pen, func() error {
-		if !win.Polyline(c.hdc, unsafe.Pointer(&pts[0].X), int32(len(pts))) {
+		if !gdi32.Polyline(c.hdc, unsafe.Pointer(&pts[0].X), int32(len(pts))) {
 			return newError("Polyline failed")
 		}
 
@@ -405,13 +408,13 @@ func (c *Canvas) DrawPolylinePixels(pen Pen, points []Point) error {
 		return nil
 	}
 
-	pts := make([]win.POINT, len(points))
+	pts := make([]gdi32.POINT, len(points))
 	for i, p := range points {
 		pts[i] = p.toPOINT()
 	}
 
 	return c.withPen(pen, func() error {
-		if !win.Polyline(c.hdc, unsafe.Pointer(&pts[0].X), int32(len(pts))) {
+		if !gdi32.Polyline(c.hdc, unsafe.Pointer(&pts[0].X), int32(len(pts))) {
 			return newError("Polyline failed")
 		}
 
@@ -429,7 +432,7 @@ func (c *Canvas) rectangle(brush Brush, pen Pen, bounds Rectangle, sizeCorrectio
 // rectanglePixels draws a rectangle in native pixels.
 func (c *Canvas) rectanglePixels(brush Brush, pen Pen, bounds Rectangle, sizeCorrection int) error {
 	return c.withBrushAndPen(brush, pen, func() error {
-		if !win.Rectangle_(
+		if !gdi32.Rectangle_(
 			c.hdc,
 			int32(bounds.X),
 			int32(bounds.Y),
@@ -479,7 +482,7 @@ func (c *Canvas) roundedRectangle(brush Brush, pen Pen, bounds Rectangle, ellips
 // roundedRectanglePixels draws a rounded rectangle in native pixels.
 func (c *Canvas) roundedRectanglePixels(brush Brush, pen Pen, bounds Rectangle, ellipseSize Size, sizeCorrection int) error {
 	return c.withBrushAndPen(brush, pen, func() error {
-		if !win.RoundRect(
+		if !gdi32.RoundRect(
 			c.hdc,
 			int32(bounds.X),
 			int32(bounds.Y),
@@ -531,7 +534,7 @@ func (c *Canvas) GradientFillRectangle(color1, color2 Color, orientation Orienta
 
 // GradientFillRectanglePixels draws a gradient filled rectangle in native pixels.
 func (c *Canvas) GradientFillRectanglePixels(color1, color2 Color, orientation Orientation, bounds Rectangle) error {
-	vertices := [2]win.TRIVERTEX{
+	vertices := [2]gdi32.TRIVERTEX{
 		{
 			X:     int32(bounds.X),
 			Y:     int32(bounds.Y),
@@ -549,7 +552,7 @@ func (c *Canvas) GradientFillRectanglePixels(color1, color2 Color, orientation O
 		},
 	}
 
-	indices := win.GRADIENT_RECT{
+	indices := gdi32.GRADIENT_RECT{
 		UpperLeft:  0,
 		LowerRight: 1,
 	}
@@ -559,7 +562,7 @@ func (c *Canvas) GradientFillRectanglePixels(color1, color2 Color, orientation O
 		o = 1
 	}
 
-	if !win.GradientFill(c.hdc, &vertices[0], 2, unsafe.Pointer(&indices), 1, o) {
+	if !gdi32.GradientFill(c.hdc, &vertices[0], 2, unsafe.Pointer(&indices), 1, o) {
 		return newError("GradientFill failed")
 	}
 
@@ -577,12 +580,13 @@ func (c *Canvas) DrawText(text string, font *Font, color Color, bounds Rectangle
 func (c *Canvas) DrawTextPixels(text string, font *Font, color Color, bounds Rectangle, format DrawTextFormat) error {
 	return c.withFontAndTextColor(font, color, func() error {
 		rect := bounds.toRECT()
-		ret := win.DrawTextEx(
+		lpchText, _ := syscall.UTF16PtrFromString(text)
+		ret := user32.DrawTextEx(
 			c.hdc,
-			syscall.StringToUTF16Ptr(text),
+			lpchText,
 			-1,
 			&rect,
-			uint32(format)|win.DT_EDITCONTROL,
+			uint32(format)|user32.DT_EDITCONTROL,
 			nil)
 		if ret == 0 {
 			return newError("DrawTextEx failed")
@@ -595,8 +599,8 @@ func (c *Canvas) DrawTextPixels(text string, font *Font, color Color, bounds Rec
 // fontHeight returns font height in native pixels.
 func (c *Canvas) fontHeight(font *Font) (height int, err error) {
 	err = c.withFontAndTextColor(font, 0, func() error {
-		var size win.SIZE
-		if !win.GetTextExtentPoint32(c.hdc, gM, 2, &size) {
+		var size gdi32.SIZE
+		if !gdi32.GetTextExtentPoint32(c.hdc, gM, 2, &size) {
 			return newError("GetTextExtentPoint32 failed")
 		}
 
@@ -613,27 +617,27 @@ func (c *Canvas) fontHeight(font *Font) (height int, err error) {
 
 // measureTextForDPI measures text for given DPI. Input and output bounds are in native pixels.
 func (c *Canvas) measureTextForDPI(text string, font *Font, bounds Rectangle, format DrawTextFormat, dpi int) (boundsMeasured Rectangle, err error) {
-	hFont := win.HGDIOBJ(font.handleForDPI(dpi))
-	oldHandle := win.SelectObject(c.hdc, hFont)
+	hFont := gdi32.HGDIOBJ(font.handleForDPI(dpi))
+	oldHandle := gdi32.SelectObject(c.hdc, hFont)
 	if oldHandle == 0 {
 		err = newError("SelectObject failed")
 		return
 	}
-	defer win.SelectObject(c.hdc, oldHandle)
+	defer gdi32.SelectObject(c.hdc, oldHandle)
 
-	rect := &win.RECT{
-		int32(bounds.X),
-		int32(bounds.Y),
-		int32(bounds.X + bounds.Width),
-		int32(bounds.Y + bounds.Height),
+	rect := &gdi32.RECT{
+		Left:   int32(bounds.X),
+		Top:    int32(bounds.Y),
+		Right:  int32(bounds.X + bounds.Width),
+		Bottom: int32(bounds.Y + bounds.Height),
 	}
-	var params win.DRAWTEXTPARAMS
+	var params user32.DRAWTEXTPARAMS
 	params.CbSize = uint32(unsafe.Sizeof(params))
 
-	strPtr := syscall.StringToUTF16Ptr(text)
-	dtfmt := uint32(format) | win.DT_CALCRECT | win.DT_EDITCONTROL | win.DT_NOPREFIX | win.DT_WORDBREAK
+	strPtr, _ := syscall.UTF16PtrFromString(text)
+	dtfmt := uint32(format) | user32.DT_CALCRECT | user32.DT_EDITCONTROL | user32.DT_NOPREFIX | user32.DT_WORDBREAK
 
-	height := win.DrawTextEx(
+	height := user32.DrawTextEx(
 		c.hdc, strPtr, -1, rect, dtfmt, &params)
 	if height == 0 {
 		err = newError("DrawTextEx failed")
@@ -706,27 +710,27 @@ func (c *Canvas) measureAndModifyTextPixels(text string, font *Font, bounds Rect
 		}
 	}
 
-	hFont := win.HGDIOBJ(font.handleForDPI(c.DPI()))
-	oldHandle := win.SelectObject(c.measureTextMetafile.hdc, hFont)
+	hFont := gdi32.HGDIOBJ(font.handleForDPI(c.DPI()))
+	oldHandle := gdi32.SelectObject(c.measureTextMetafile.hdc, hFont)
 	if oldHandle == 0 {
 		err = newError("SelectObject failed")
 		return
 	}
-	defer win.SelectObject(c.measureTextMetafile.hdc, oldHandle)
+	defer gdi32.SelectObject(c.measureTextMetafile.hdc, oldHandle)
 
-	rect := &win.RECT{
-		int32(bounds.X),
-		int32(bounds.Y),
-		int32(bounds.X + bounds.Width),
-		int32(bounds.Y + bounds.Height),
+	rect := &gdi32.RECT{
+		Left:   int32(bounds.X),
+		Top:    int32(bounds.Y),
+		Right:  int32(bounds.X + bounds.Width),
+		Bottom: int32(bounds.Y + bounds.Height),
 	}
-	var params win.DRAWTEXTPARAMS
+	var params user32.DRAWTEXTPARAMS
 	params.CbSize = uint32(unsafe.Sizeof(params))
 
-	strPtr := syscall.StringToUTF16Ptr(text)
-	dtfmt := uint32(format) | win.DT_EDITCONTROL | win.DT_WORDBREAK
+	strPtr, _ := syscall.UTF16PtrFromString(text)
+	dtfmt := uint32(format) | user32.DT_EDITCONTROL | user32.DT_WORDBREAK
 
-	height := win.DrawTextEx(
+	height := user32.DrawTextEx(
 		c.measureTextMetafile.hdc, strPtr, -1, rect, dtfmt, &params)
 	if height == 0 {
 		err = newError("DrawTextEx failed")

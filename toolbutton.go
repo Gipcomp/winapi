@@ -4,10 +4,11 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
 )
 
 type ToolButton struct {
@@ -21,7 +22,7 @@ func NewToolButton(parent Container) (*ToolButton, error) {
 		tb,
 		parent,
 		"BUTTON",
-		win.WS_TABSTOP|win.WS_VISIBLE|win.BS_BITMAP|win.BS_PUSHBUTTON,
+		user32.WS_TABSTOP|user32.WS_VISIBLE|user32.BS_BITMAP|user32.BS_PUSHBUTTON,
 		0); err != nil {
 		return nil, err
 	}
@@ -34,10 +35,10 @@ func NewToolButton(parent Container) (*ToolButton, error) {
 	return tb, nil
 }
 
-func (tb *ToolButton) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (tb *ToolButton) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_GETDLGCODE:
-		return win.DLGC_BUTTON
+	case user32.WM_GETDLGCODE:
+		return user32.DLGC_BUTTON
 	}
 
 	return tb.Button.WndProc(hwnd, msg, wParam, lParam)

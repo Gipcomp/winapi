@@ -4,12 +4,13 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
 )
 
 type GradientComposite struct {
@@ -261,12 +262,12 @@ func (gc *GradientComposite) Dispose() {
 	gc.Composite.Dispose()
 }
 
-func (gc *GradientComposite) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (gc *GradientComposite) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_WINDOWPOSCHANGED:
-		wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
+	case user32.WM_WINDOWPOSCHANGED:
+		wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
 
-		if wp.Flags&win.SWP_NOSIZE != 0 {
+		if wp.Flags&user32.SWP_NOSIZE != 0 {
 			break
 		}
 

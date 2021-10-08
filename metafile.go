@@ -4,27 +4,27 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"math"
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
 )
 
 const milimeterPerMeter float64 = 1000.0
 
 type Metafile struct {
-	hdc  win.HDC
-	hemf win.HENHMETAFILE
+	hdc  gdi32.HDC
+	hemf gdi32.HENHMETAFILE
 	size Size // in native pixels
 	dpi  Size
 }
 
 func NewMetafile(referenceCanvas *Canvas) (*Metafile, error) {
-	hdc := win.CreateEnhMetaFile(referenceCanvas.hdc, nil, nil, nil)
+	hdc := gdi32.CreateEnhMetaFile(referenceCanvas.hdc, nil, nil, nil)
 	if hdc == 0 {
 		return nil, newError("CreateEnhMetaFile failed")
 	}
@@ -33,14 +33,18 @@ func NewMetafile(referenceCanvas *Canvas) (*Metafile, error) {
 }
 
 func NewMetafileFromFile(filePath string) (*Metafile, error) {
-	hemf := win.GetEnhMetaFile(syscall.StringToUTF16Ptr(filePath))
+	strPtr, err := syscall.UTF16PtrFromString(filePath)
+	if err != nil {
+		return nil, err
+	}
+	hemf := gdi32.GetEnhMetaFile(strPtr)
 	if hemf == 0 {
 		return nil, newError("GetEnhMetaFile failed")
 	}
 
 	mf := &Metafile{hemf: hemf}
 
-	err := mf.readSizeFromHeader()
+	err = mf.readSizeFromHeader()
 	if err != nil {
 		return nil, err
 	}
@@ -52,27 +56,31 @@ func (mf *Metafile) Dispose() {
 	mf.ensureFinished()
 
 	if mf.hemf != 0 {
-		win.DeleteEnhMetaFile(mf.hemf)
+		gdi32.DeleteEnhMetaFile(mf.hemf)
 
 		mf.hemf = 0
 	}
 }
 
 func (mf *Metafile) Save(filePath string) error {
-	hemf := win.CopyEnhMetaFile(mf.hemf, syscall.StringToUTF16Ptr(filePath))
+	strPtr, err := syscall.UTF16PtrFromString(filePath)
+	if err != nil {
+		return err
+	}
+	hemf := gdi32.CopyEnhMetaFile(mf.hemf, strPtr)
 	if hemf == 0 {
 		return newError("CopyEnhMetaFile failed")
 	}
 
-	win.DeleteEnhMetaFile(hemf)
+	gdi32.DeleteEnhMetaFile(hemf)
 
 	return nil
 }
 
 func (mf *Metafile) readSizeFromHeader() error {
-	var hdr win.ENHMETAHEADER
+	var hdr gdi32.ENHMETAHEADER
 
-	if win.GetEnhMetaFileHeader(mf.hemf, uint32(unsafe.Sizeof(hdr)), &hdr) == 0 {
+	if gdi32.GetEnhMetaFileHeader(mf.hemf, uint32(unsafe.Sizeof(hdr)), &hdr) == 0 {
 		return newError("GetEnhMetaFileHeader failed")
 	}
 
@@ -95,7 +103,7 @@ func (mf *Metafile) ensureFinished() error {
 		}
 	}
 
-	mf.hemf = win.CloseEnhMetaFile(mf.hdc)
+	mf.hemf = gdi32.CloseEnhMetaFile(mf.hdc)
 	if mf.hemf == 0 {
 		return newError("CloseEnhMetaFile failed")
 	}
@@ -113,14 +121,14 @@ func (mf *Metafile) Size() Size {
 	}
 }
 
-func (mf *Metafile) draw(hdc win.HDC, location Point) error {
+func (mf *Metafile) draw(hdc gdi32.HDC, location Point) error {
 	return mf.drawStretched(hdc, Rectangle{location.X, location.Y, mf.size.Width, mf.size.Height})
 }
 
-func (mf *Metafile) drawStretched(hdc win.HDC, bounds Rectangle) error {
+func (mf *Metafile) drawStretched(hdc gdi32.HDC, bounds Rectangle) error {
 	rc := bounds.toRECT()
 
-	if !win.PlayEnhMetaFile(hdc, mf.hemf, &rc) {
+	if !gdi32.PlayEnhMetaFile(hdc, mf.hemf, &rc) {
 		return newError("PlayEnhMetaFile failed")
 	}
 

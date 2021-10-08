@@ -4,14 +4,14 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"math"
 	"sort"
 	"sync"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
 )
 
 type Orientation byte
@@ -25,7 +25,7 @@ const (
 type BoxLayout struct {
 	LayoutBase
 	orientation        Orientation
-	hwnd2StretchFactor map[win.HWND]int
+	hwnd2StretchFactor map[handle.HWND]int
 }
 
 func newBoxLayout(orientation Orientation) *BoxLayout {
@@ -35,7 +35,7 @@ func newBoxLayout(orientation Orientation) *BoxLayout {
 			spacing96dpi: 6,
 		},
 		orientation:        orientation,
-		hwnd2StretchFactor: make(map[win.HWND]int),
+		hwnd2StretchFactor: make(map[handle.HWND]int),
 	}
 	l.layout = l
 
@@ -106,7 +106,7 @@ func (l *BoxLayout) CreateLayoutItem(ctx *LayoutContext) ContainerLayoutItem {
 	li := &boxLayoutItem{
 		size2MinSize:       make(map[Size]Size),
 		orientation:        l.orientation,
-		hwnd2StretchFactor: make(map[win.HWND]int),
+		hwnd2StretchFactor: make(map[handle.HWND]int),
 	}
 
 	for hwnd, sf := range l.hwnd2StretchFactor {
@@ -162,7 +162,7 @@ type boxLayoutItem struct {
 	mutex              sync.Mutex
 	size2MinSize       map[Size]Size // in native pixels
 	orientation        Orientation
-	hwnd2StretchFactor map[win.HWND]int
+	hwnd2StretchFactor map[handle.HWND]int
 }
 
 func (li *boxLayoutItem) LayoutFlags() LayoutFlags {
@@ -266,7 +266,7 @@ func boxLayoutFlags(orientation Orientation, children []LayoutItem) LayoutFlags 
 }
 
 // boxLayoutItems lays out items. bounds parameter is in native pixels.
-func boxLayoutItems(container ContainerLayoutItem, items []LayoutItem, orientation Orientation, alignment Alignment2D, bounds Rectangle, margins96dpi Margins, spacing96dpi int, hwnd2StretchFactor map[win.HWND]int) []LayoutResultItem {
+func boxLayoutItems(container ContainerLayoutItem, items []LayoutItem, orientation Orientation, alignment Alignment2D, bounds Rectangle, margins96dpi Margins, spacing96dpi int, hwnd2StretchFactor map[handle.HWND]int) []LayoutResultItem {
 	if len(items) == 0 {
 		return nil
 	}

@@ -4,12 +4,12 @@
 
 // +build windows,walk_use_cgo
 
-package walk
+package winapi
 
 import (
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/user32"
 )
 
 // #include <windows.h>
@@ -43,7 +43,7 @@ import "C"
 
 //export shimHandleKeyDown
 func shimHandleKeyDown(fb uintptr, msg uintptr) bool {
-	return (*FormBase)(unsafe.Pointer(fb)).handleKeyDown((*win.MSG)(unsafe.Pointer(msg)))
+	return (*FormBase)(unsafe.Pointer(fb)).handleKeyDown((.user32.MSG)(unsafe.Pointer(msg)))
 }
 
 //export shimRunSynchronized

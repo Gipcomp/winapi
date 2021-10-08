@@ -4,9 +4,11 @@
 
 // +build windows
 
-package walk
+package winapi
 
-import "github.com/lxn/win"
+import (
+	"github.com/Gipcomp/win32/gdi32"
+)
 
 // Size defines width and height in 1/96" units or native pixels, or dialog base units.
 //
@@ -19,8 +21,8 @@ func (s Size) IsZero() bool {
 	return s.Width == 0 && s.Height == 0
 }
 
-func (s Size) toSIZE() win.SIZE {
-	return win.SIZE{
+func (s Size) toSIZE() gdi32.SIZE {
+	return gdi32.SIZE{
 		CX: int32(s.Width),
 		CY: int32(s.Height),
 	}
@@ -62,14 +64,14 @@ func maxSize(a, b Size) Size {
 	return s
 }
 
-func sizeFromSIZE(s win.SIZE) Size {
+func sizeFromSIZE(s gdi32.SIZE) Size {
 	return Size{
 		Width:  int(s.CX),
 		Height: int(s.CY),
 	}
 }
 
-func sizeFromRECT(r win.RECT) Size {
+func sizeFromRECT(r gdi32.RECT) Size {
 	return Size{
 		Width:  int(r.Right - r.Left),
 		Height: int(r.Bottom - r.Top),

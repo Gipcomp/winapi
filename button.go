@@ -4,13 +4,17 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"fmt"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/comctl32"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 type clickable interface {
@@ -84,11 +88,11 @@ func (b *Button) SetImage(image Image) error {
 	case nil:
 
 	case *Bitmap:
-		typ = win.IMAGE_BITMAP
+		typ = user32.IMAGE_BITMAP
 		handle = uintptr(img.hBmp)
 
 	case *Icon:
-		typ = win.IMAGE_ICON
+		typ = user32.IMAGE_ICON
 		handle = uintptr(img.handleForDPI(b.DPI()))
 
 	default:
@@ -97,11 +101,11 @@ func (b *Button) SetImage(image Image) error {
 			return err
 		}
 
-		typ = win.IMAGE_BITMAP
+		typ = user32.IMAGE_BITMAP
 		handle = uintptr(bmp.hBmp)
 	}
 
-	b.SendMessage(win.BM_SETIMAGE, typ, handle)
+	b.SendMessage(user32.BM_SETIMAGE, typ, handle)
 
 	b.image = image
 
@@ -135,7 +139,7 @@ func (b *Button) SetText(value string) error {
 }
 
 func (b *Button) Checked() bool {
-	return b.SendMessage(win.BM_GETCHECK, 0, 0) == win.BST_CHECKED
+	return b.SendMessage(user32.BM_GETCHECK, 0, 0) == user32.BST_CHECKED
 }
 
 func (b *Button) SetChecked(checked bool) {
@@ -150,12 +154,12 @@ func (b *Button) setChecked(checked bool) {
 	var chk uintptr
 
 	if checked {
-		chk = win.BST_CHECKED
+		chk = user32.BST_CHECKED
 	} else {
-		chk = win.BST_UNCHECKED
+		chk = user32.BST_UNCHECKED
 	}
 
-	b.SendMessage(win.BM_SETCHECK, chk, 0)
+	b.SendMessage(user32.BM_SETCHECK, chk, 0)
 
 	b.checkedChangedPublisher.Publish()
 }
@@ -195,9 +199,9 @@ func (b *Button) raiseClicked() {
 	b.clickedPublisher.Publish()
 }
 
-func (b *Button) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (b *Button) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_COMMAND:
+	case user32.WM_COMMAND:
 		hiWP := win.HIWORD(uint32(wParam))
 
 		if hiWP == 0 && lParam == 0 {
@@ -206,12 +210,12 @@ func (b *Button) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uint
 			}
 		} else {
 			switch hiWP {
-			case win.BN_CLICKED:
+			case user32.BN_CLICKED:
 				b.raiseClicked()
 			}
 		}
 
-	case win.WM_SETTEXT:
+	case user32.WM_SETTEXT:
 		b.textChangedPublisher.Publish()
 	}
 
@@ -226,8 +230,8 @@ func (b *Button) idealSize() Size {
 		return min
 	}
 
-	var s win.SIZE
-	b.SendMessage(win.BCM_GETIDEALSIZE, 0, uintptr(unsafe.Pointer(&s)))
+	var s gdi32.SIZE
+	b.SendMessage(comctl32.BCM_GETIDEALSIZE, 0, uintptr(unsafe.Pointer(&s)))
 
 	return maxSize(sizeFromSIZE(s), min)
 }

@@ -4,14 +4,20 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"strconv"
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/uxtheme"
+	"github.com/Gipcomp/win32/win"
 )
 
 const tabWidgetWindowClass = `\o/ Walk_TabWidget_Class \o/`
@@ -25,7 +31,7 @@ func init() {
 
 type TabWidget struct {
 	WidgetBase
-	hWndTab                      win.HWND
+	hWndTab                      handle.HWND
 	tabOrigWndProcPtr            uintptr
 	imageList                    *ImageList
 	pages                        *TabPageList
@@ -43,8 +49,8 @@ func NewTabWidget(parent Container) (*TabWidget, error) {
 		tw,
 		parent,
 		tabWidgetWindowClass,
-		win.WS_VISIBLE,
-		win.WS_EX_CONTROLPARENT); err != nil {
+		user32.WS_VISIBLE,
+		user32.WS_EX_CONTROLPARENT); err != nil {
 		return nil, err
 	}
 
@@ -56,20 +62,23 @@ func NewTabWidget(parent Container) (*TabWidget, error) {
 	}()
 
 	tw.SetPersistent(true)
-
-	tw.hWndTab = win.CreateWindowEx(
-		0, syscall.StringToUTF16Ptr("SysTabControl32"), nil,
-		win.WS_CHILD|win.WS_CLIPSIBLINGS|win.WS_TABSTOP|win.WS_VISIBLE,
+	strPtr, err := syscall.UTF16PtrFromString("SysTabControl32")
+	if err != nil {
+		return nil, err
+	}
+	tw.hWndTab = user32.CreateWindowEx(
+		0, strPtr, nil,
+		user32.WS_CHILD|user32.WS_CLIPSIBLINGS|user32.WS_TABSTOP|user32.WS_VISIBLE,
 		0, 0, 0, 0, tw.hWnd, 0, 0, nil)
 	if tw.hWndTab == 0 {
 		return nil, lastError("CreateWindowEx")
 	}
 
-	win.SetWindowLongPtr(tw.hWndTab, win.GWLP_USERDATA, uintptr(unsafe.Pointer(tw)))
-	tw.tabOrigWndProcPtr = win.SetWindowLongPtr(tw.hWndTab, win.GWLP_WNDPROC, tabWidgetTabWndProcPtr)
+	user32.SetWindowLongPtr(tw.hWndTab, user32.GWLP_USERDATA, uintptr(unsafe.Pointer(tw)))
+	tw.tabOrigWndProcPtr = user32.SetWindowLongPtr(tw.hWndTab, user32.GWLP_WNDPROC, tabWidgetTabWndProcPtr)
 
-	dpi := int(win.GetDpiForWindow(tw.hWndTab))
-	win.SendMessage(tw.hWndTab, win.WM_SETFONT, uintptr(defaultFont.handleForDPI(dpi)), 1)
+	dpi := int(user32.GetDpiForWindow(tw.hWndTab))
+	user32.SendMessage(tw.hWndTab, user32.WM_SETFONT, uintptr(defaultFont.handleForDPI(dpi)), 1)
 
 	tw.applyFont(tw.Font())
 
@@ -136,7 +145,7 @@ func (tw *TabWidget) ApplyDPI(dpi int) {
 		return
 	}
 
-	win.SendMessage(tw.hWndTab, win.TCM_SETIMAGELIST, 0, uintptr(iml.hIml))
+	user32.SendMessage(tw.hWndTab, commctrl.TCM_SETIMAGELIST, 0, uintptr(iml.hIml))
 
 	if tw.imageList != nil {
 		tw.imageList.Dispose()
@@ -162,7 +171,7 @@ func (tw *TabWidget) SetCurrentIndex(index int) error {
 		return newError("invalid index")
 	}
 
-	ret := int(win.SendMessage(tw.hWndTab, win.TCM_SETCURSEL, uintptr(index), 0))
+	ret := int(user32.SendMessage(tw.hWndTab, commctrl.TCM_SETCURSEL, uintptr(index), 0))
 	if ret == -1 {
 		return newError("SendMessage(TCM_SETCURSEL) failed")
 	}
@@ -240,28 +249,28 @@ func (tw *TabWidget) resizePages() {
 
 // pageBounds returns page bounds in native pixels.
 func (tw *TabWidget) pageBounds() Rectangle {
-	var r win.RECT
-	if !win.GetWindowRect(tw.hWndTab, &r) {
+	var r gdi32.RECT
+	if !user32.GetWindowRect(tw.hWndTab, &r) {
 		lastError("GetWindowRect")
 		return Rectangle{}
 	}
 
-	p := win.POINT{
-		r.Left,
-		r.Top,
+	p := gdi32.POINT{
+		X: r.Left,
+		Y: r.Top,
 	}
-	if !win.ScreenToClient(tw.hWnd, &p) {
+	if !user32.ScreenToClient(tw.hWnd, &p) {
 		newError("ScreenToClient failed")
 		return Rectangle{}
 	}
 
-	r = win.RECT{
-		p.X,
-		p.Y,
-		r.Right - r.Left + p.X,
-		r.Bottom - r.Top + p.Y,
+	r = gdi32.RECT{
+		Left:   p.X,
+		Top:    p.Y,
+		Right:  r.Right - r.Left + p.X,
+		Bottom: r.Bottom - r.Top + p.Y,
 	}
-	win.SendMessage(tw.hWndTab, win.TCM_ADJUSTRECT, 0, uintptr(unsafe.Pointer(&r)))
+	user32.SendMessage(tw.hWndTab, commctrl.TCM_ADJUSTRECT, 0, uintptr(unsafe.Pointer(&r)))
 
 	adjustment := 2 * int32(tw.IntFrom96DPI(1))
 	return Rectangle{
@@ -273,7 +282,7 @@ func (tw *TabWidget) pageBounds() Rectangle {
 }
 
 func (tw *TabWidget) onResize(width, height int32) {
-	if !win.MoveWindow(tw.hWndTab, 0, 0, width, height, true) {
+	if !user32.MoveWindow(tw.hWndTab, 0, 0, width, height, true) {
 		lastError("MoveWindow")
 		return
 	}
@@ -289,7 +298,7 @@ func (tw *TabWidget) onSelChange() {
 		page.SetVisible(false)
 	}
 
-	tw.currentIndex = int(int32(win.SendMessage(tw.hWndTab, win.TCM_GETCURSEL, 0, 0)))
+	tw.currentIndex = int(int32(user32.SendMessage(tw.hWndTab, commctrl.TCM_GETCURSEL, 0, 0)))
 
 	if tw.currentIndex > -1 && tw.currentIndex < pageCount {
 		page := tw.pages.At(tw.currentIndex)
@@ -298,8 +307,8 @@ func (tw *TabWidget) onSelChange() {
 		page.Invalidate()
 
 		var containsFocus bool
-		tw.forEachDescendantRaw(uintptr(win.GetFocus()), func(hwnd win.HWND, lParam uintptr) bool {
-			if hwnd == win.HWND(lParam) {
+		tw.forEachDescendantRaw(uintptr(user32.GetFocus()), func(hwnd handle.HWND, lParam uintptr) bool {
+			if hwnd == handle.HWND(lParam) {
 				containsFocus = true
 			}
 			return !containsFocus
@@ -314,26 +323,26 @@ func (tw *TabWidget) onSelChange() {
 	tw.currentIndexChangedPublisher.Publish()
 }
 
-func (tw *TabWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (tw *TabWidget) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	if tw.hWndTab != 0 {
 		switch msg {
-		case win.WM_ERASEBKGND:
+		case user32.WM_ERASEBKGND:
 			return 1
 
-		case win.WM_WINDOWPOSCHANGED:
-			wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
+		case user32.WM_WINDOWPOSCHANGED:
+			wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
 
-			if wp.Flags&win.SWP_NOSIZE != 0 {
+			if wp.Flags&user32.SWP_NOSIZE != 0 {
 				break
 			}
 
 			tw.onResize(wp.Cx, wp.Cy)
 
-		case win.WM_NOTIFY:
-			nmhdr := (*win.NMHDR)(unsafe.Pointer(lParam))
+		case user32.WM_NOTIFY:
+			nmhdr := (*user32.NMHDR)(unsafe.Pointer(lParam))
 
 			switch int32(nmhdr.Code) {
-			case win.TCN_SELCHANGE:
+			case commctrl.TCN_SELCHANGE:
 				tw.onSelChange()
 			}
 		}
@@ -344,21 +353,21 @@ func (tw *TabWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) 
 
 var tabWidgetTabWndProcPtr uintptr
 
-func tabWidgetTabWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
-	tw := (*TabWidget)(unsafe.Pointer(win.GetWindowLongPtr(hwnd, win.GWLP_USERDATA)))
+func tabWidgetTabWndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+	tw := (*TabWidget)(unsafe.Pointer(user32.GetWindowLongPtr(hwnd, user32.GWLP_USERDATA)))
 
 	switch msg {
-	case win.WM_MOUSEMOVE:
-		win.InvalidateRect(hwnd, nil, true)
+	case user32.WM_MOUSEMOVE:
+		user32.InvalidateRect(hwnd, nil, true)
 
-	case win.WM_ERASEBKGND:
+	case user32.WM_ERASEBKGND:
 		return 1
 
-	case win.WM_PAINT:
-		var ps win.PAINTSTRUCT
+	case user32.WM_PAINT:
+		var ps user32.PAINTSTRUCT
 
-		hdc := win.BeginPaint(hwnd, &ps)
-		defer win.EndPaint(hwnd, &ps)
+		hdc := user32.BeginPaint(hwnd, &ps)
+		defer user32.EndPaint(hwnd, &ps)
 
 		cb := tw.ClientBoundsPixels()
 
@@ -375,7 +384,7 @@ func tabWidgetTabWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uint
 		}
 		defer canvas.Dispose()
 
-		themed := win.IsAppThemed()
+		themed := uxtheme.IsAppThemed()
 
 		if !themed {
 			if err := canvas.FillRectanglePixels(sysColorBtnFaceBrush, cb); err != nil {
@@ -383,7 +392,7 @@ func tabWidgetTabWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uint
 			}
 		}
 
-		win.SendMessage(hwnd, win.WM_PRINTCLIENT, uintptr(canvas.hdc), uintptr(win.PRF_CLIENT|win.PRF_CHILDREN|win.PRF_ERASEBKGND))
+		user32.SendMessage(hwnd, user32.WM_PRINTCLIENT, uintptr(canvas.hdc), uintptr(gdi32.PRF_CLIENT|gdi32.PRF_CHILDREN|gdi32.PRF_ERASEBKGND))
 
 		parent := tw.Parent()
 		if parent == nil {
@@ -394,15 +403,15 @@ func tabWidgetTabWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uint
 		if bg, wnd := parent.AsWindowBase().backgroundEffective(); bg != nil {
 			tw.prepareDCForBackground(canvas.hdc, hwnd, wnd)
 
-			hRgn := win.CreateRectRgn(0, 0, 0, 0)
-			defer win.DeleteObject(win.HGDIOBJ(hRgn))
+			hRgn := gdi32.CreateRectRgn(0, 0, 0, 0)
+			defer gdi32.DeleteObject(gdi32.HGDIOBJ(hRgn))
 
-			var rc win.RECT
+			var rc gdi32.RECT
 
 			adjustment := SizeFrom96DPI(Size{1, 1}, dpi).toSIZE()
 			count := tw.pages.Len()
 			for i := 0; i < count; i++ {
-				if 0 == win.SendMessage(hwnd, win.TCM_GETITEMRECT, uintptr(i), uintptr(unsafe.Pointer(&rc))) {
+				if user32.SendMessage(hwnd, commctrl.TCM_GETITEMRECT, uintptr(i), uintptr(unsafe.Pointer(&rc))) == 0 {
 					break
 				}
 
@@ -416,16 +425,16 @@ func tabWidgetTabWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uint
 					}
 				}
 
-				hRgnTab := win.CreateRectRgn(rc.Left, rc.Top, rc.Right, rc.Bottom)
-				win.CombineRgn(hRgn, hRgn, hRgnTab, win.RGN_OR)
-				win.DeleteObject(win.HGDIOBJ(hRgnTab))
+				hRgnTab := gdi32.CreateRectRgn(rc.Left, rc.Top, rc.Right, rc.Bottom)
+				gdi32.CombineRgn(hRgn, hRgn, hRgnTab, gdi32.RGN_OR)
+				gdi32.DeleteObject(gdi32.HGDIOBJ(hRgnTab))
 			}
 
-			hRgnRC := win.CreateRectRgn(0, 0, int32(cb.Width), rc.Bottom)
-			win.CombineRgn(hRgn, hRgnRC, hRgn, win.RGN_DIFF)
-			win.DeleteObject(win.HGDIOBJ(hRgnRC))
+			hRgnRC := gdi32.CreateRectRgn(0, 0, int32(cb.Width), rc.Bottom)
+			gdi32.CombineRgn(hRgn, hRgnRC, hRgn, gdi32.RGN_DIFF)
+			gdi32.DeleteObject(gdi32.HGDIOBJ(hRgnRC))
 
-			if !win.FillRgn(canvas.hdc, hRgn, bg.handle()) {
+			if !gdi32.FillRgn(canvas.hdc, hRgn, bg.handle()) {
 				break
 			}
 		}
@@ -440,15 +449,15 @@ func tabWidgetTabWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uint
 
 				tw.prepareDCForBackground(canvas.hdc, hwnd, wnd)
 
-				var rc win.RECT
-				if 0 == win.SendMessage(hwnd, win.TCM_GETITEMRECT, uintptr(tw.currentIndex), uintptr(unsafe.Pointer(&rc))) {
+				var rc gdi32.RECT
+				if user32.SendMessage(hwnd, commctrl.TCM_GETITEMRECT, uintptr(tw.currentIndex), uintptr(unsafe.Pointer(&rc))) == 0 {
 					break
 				}
 
 				adjustment := SizeFrom96DPI(Size{6, 1}, dpi).toSIZE()
-				hRgn := win.CreateRectRgn(rc.Left, rc.Top, rc.Right, rc.Bottom+2*adjustment.CY)
-				defer win.DeleteObject(win.HGDIOBJ(hRgn))
-				if !win.FillRgn(canvas.hdc, hRgn, bg.handle()) {
+				hRgn := gdi32.CreateRectRgn(rc.Left, rc.Top, rc.Right, rc.Bottom+2*adjustment.CY)
+				defer gdi32.DeleteObject(gdi32.HGDIOBJ(hRgn))
+				if !gdi32.FillRgn(canvas.hdc, hRgn, bg.handle()) {
 					break
 				}
 
@@ -462,7 +471,7 @@ func tabWidgetTabWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uint
 						if imageCanvas, err := NewCanvasFromImage(bmp); err == nil {
 							defer imageCanvas.Dispose()
 
-							if !win.TransparentBlt(
+							if !gdi32.TransparentBlt(
 								canvas.hdc, x, y, s, s,
 								imageCanvas.hdc, 0, 0, int32(bmp.size.Width), int32(bmp.size.Height),
 								0) {
@@ -477,40 +486,47 @@ func tabWidgetTabWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uint
 				rc.Left += adjustment.CX
 				rc.Top += adjustment.CY
 
-				title := syscall.StringToUTF16(page.title)
+				title, err := syscall.UTF16FromString(page.title)
+				if err != nil {
+					newError(err.Error())
+				}
 
 				if themed {
-					hTheme := win.OpenThemeData(hwnd, syscall.StringToUTF16Ptr("tab"))
-					defer win.CloseThemeData(hTheme)
+					tab, err := syscall.UTF16PtrFromString("tab")
+					if err != nil {
+						newError(err.Error())
+					}
+					hTheme := uxtheme.OpenThemeData(hwnd, tab)
+					defer uxtheme.CloseThemeData(hTheme)
 
-					options := win.DTTOPTS{DwFlags: win.DTT_GLOWSIZE, IGlowSize: int32(IntFrom96DPI(3, dpi))}
+					options := uxtheme.DTTOPTS{DwFlags: uxtheme.DTT_GLOWSIZE, IGlowSize: int32(IntFrom96DPI(3, dpi))}
 					options.DwSize = uint32(unsafe.Sizeof(options))
-					if hr := win.DrawThemeTextEx(hTheme, canvas.hdc, 0, win.TIS_SELECTED, &title[0], int32(len(title)), 0, &rc, &options); !win.SUCCEEDED(hr) {
+					if hr := uxtheme.DrawThemeTextEx(hTheme, canvas.hdc, 0, uxtheme.TIS_SELECTED, &title[0], int32(len(title)), 0, &rc, &options); !win.SUCCEEDED(hr) {
 						break
 					}
 				} else {
-					if 0 == win.DrawTextEx(canvas.hdc, &title[0], int32(len(title)), &rc, 0, nil) {
+					if user32.DrawTextEx(canvas.hdc, &title[0], int32(len(title)), &rc, 0, nil) == 0 {
 						break
 					}
 				}
 			}
 		}
 
-		if !win.BitBlt(hdc, 0, 0, int32(cb.Width), int32(cb.Height), canvas.hdc, 0, 0, win.SRCCOPY) {
+		if !gdi32.BitBlt(hdc, 0, 0, int32(cb.Width), int32(cb.Height), canvas.hdc, 0, 0, gdi32.SRCCOPY) {
 			break
 		}
 
 		return 0
 	}
 
-	return win.CallWindowProc(tw.tabOrigWndProcPtr, hwnd, msg, wParam, lParam)
+	return user32.CallWindowProc(tw.tabOrigWndProcPtr, hwnd, msg, wParam, lParam)
 }
 
 func (tw *TabWidget) onPageChanged(page *TabPage) (err error) {
 	index := tw.pages.Index(page)
 	item := tw.tcitemFromPage(page)
 
-	if 0 == win.SendMessage(tw.hWndTab, win.TCM_SETITEM, uintptr(index), uintptr(unsafe.Pointer(item))) {
+	if user32.SendMessage(tw.hWndTab, commctrl.TCM_SETITEM, uintptr(index), uintptr(unsafe.Pointer(item))) == 0 {
 		return newError("SendMessage(TCM_SETITEM) failed")
 	}
 
@@ -526,26 +542,26 @@ func (tw *TabWidget) onInsertingPage(index int, page *TabPage) (err error) {
 func (tw *TabWidget) onInsertedPage(index int, page *TabPage) (err error) {
 	item := tw.tcitemFromPage(page)
 
-	if idx := int(win.SendMessage(tw.hWndTab, win.TCM_INSERTITEM, uintptr(index), uintptr(unsafe.Pointer(item)))); idx == -1 {
+	if idx := int(user32.SendMessage(tw.hWndTab, commctrl.TCM_INSERTITEM, uintptr(index), uintptr(unsafe.Pointer(item)))); idx == -1 {
 		return newError("SendMessage(TCM_INSERTITEM) failed")
 	}
 
 	page.SetVisible(false)
 
-	style := uint32(win.GetWindowLong(page.hWnd, win.GWL_STYLE))
+	style := uint32(user32.GetWindowLong(page.hWnd, user32.GWL_STYLE))
 	if style == 0 {
 		return lastError("GetWindowLong")
 	}
 
-	style |= win.WS_CHILD
-	style &^= win.WS_POPUP
+	style |= user32.WS_CHILD
+	style &^= user32.WS_POPUP
 
-	win.SetLastError(0)
-	if win.SetWindowLong(page.hWnd, win.GWL_STYLE, int32(style)) == 0 {
+	kernel32.SetLastError(0)
+	if user32.SetWindowLong(page.hWnd, user32.GWL_STYLE, int32(style)) == 0 {
 		return lastError("SetWindowLong")
 	}
 
-	if win.SetParent(page.hWnd, tw.hWnd) == 0 {
+	if user32.SetParent(page.hWnd, tw.hWnd) == 0 {
 		return lastError("SetParent")
 	}
 
@@ -568,16 +584,16 @@ func (tw *TabWidget) onInsertedPage(index int, page *TabPage) (err error) {
 func (tw *TabWidget) removePage(page *TabPage) (err error) {
 	page.SetVisible(false)
 
-	style := uint32(win.GetWindowLong(page.hWnd, win.GWL_STYLE))
+	style := uint32(user32.GetWindowLong(page.hWnd, user32.GWL_STYLE))
 	if style == 0 {
 		return lastError("GetWindowLong")
 	}
 
-	style &^= win.WS_CHILD
-	style |= win.WS_POPUP
+	style &^= user32.WS_CHILD
+	style |= user32.WS_POPUP
 
-	win.SetLastError(0)
-	if win.SetWindowLong(page.hWnd, win.GWL_STYLE, int32(style)) == 0 {
+	kernel32.SetLastError(0)
+	if user32.SetWindowLong(page.hWnd, user32.GWL_STYLE, int32(style)) == 0 {
 		return lastError("SetWindowLong")
 	}
 
@@ -596,11 +612,11 @@ func (tw *TabWidget) onRemovedPage(index int, page *TabPage) (err error) {
 		return
 	}
 
-	win.SendMessage(tw.hWndTab, win.TCM_DELETEITEM, uintptr(index), 0)
+	user32.SendMessage(tw.hWndTab, commctrl.TCM_DELETEITEM, uintptr(index), 0)
 
 	if tw.pages.Len() > 0 {
 		tw.currentIndex = 0
-		win.SendMessage(tw.hWndTab, win.TCM_SETCURSEL, uintptr(tw.currentIndex), 0)
+		user32.SendMessage(tw.hWndTab, commctrl.TCM_SETCURSEL, uintptr(tw.currentIndex), 0)
 	} else {
 		tw.currentIndex = -1
 	}
@@ -635,7 +651,7 @@ func (tw *TabWidget) onClearingPages(pages []*TabPage) (err error) {
 }
 
 func (tw *TabWidget) onClearedPages(pages []*TabPage) (err error) {
-	win.SendMessage(tw.hWndTab, win.TCM_DELETEALLITEMS, 0, 0)
+	user32.SendMessage(tw.hWndTab, commctrl.TCM_DELETEALLITEMS, 0, 0)
 	for _, page := range pages {
 		tw.removePage(page)
 	}
@@ -646,7 +662,7 @@ func (tw *TabWidget) onClearedPages(pages []*TabPage) (err error) {
 	return nil
 }
 
-func (tw *TabWidget) tcitemFromPage(page *TabPage) *win.TCITEM {
+func (tw *TabWidget) tcitemFromPage(page *TabPage) *commctrl.TCITEM {
 	var imageIndex int32 = -1
 	if page.image != nil {
 		if bmp, err := iconCache.Bitmap(page.image, tw.DPI()); err == nil {
@@ -654,10 +670,13 @@ func (tw *TabWidget) tcitemFromPage(page *TabPage) *win.TCITEM {
 		}
 	}
 
-	text := syscall.StringToUTF16(page.title)
+	text, err := syscall.UTF16FromString(page.title)
+	if err != nil {
+		newError(err.Error())
+	}
 
-	item := &win.TCITEM{
-		Mask:       win.TCIF_IMAGE | win.TCIF_TEXT,
+	item := &commctrl.TCITEM{
+		Mask:       commctrl.TCIF_IMAGE | commctrl.TCIF_TEXT,
 		IImage:     imageIndex,
 		PszText:    &text[0],
 		CchTextMax: int32(len(text)),
@@ -675,7 +694,7 @@ func (tw *TabWidget) imageIndex(image *Bitmap) (index int32, err error) {
 				return
 			}
 
-			win.SendMessage(tw.hWndTab, win.TCM_SETIMAGELIST, 0, uintptr(tw.imageList.hIml))
+			user32.SendMessage(tw.hWndTab, commctrl.TCM_SETIMAGELIST, 0, uintptr(tw.imageList.hIml))
 		}
 
 		if index, err = tw.imageList.AddMasked(image); err != nil {
@@ -687,9 +706,9 @@ func (tw *TabWidget) imageIndex(image *Bitmap) (index int32, err error) {
 }
 
 func (tw *TabWidget) updateNonClientSize() {
-	rc := win.RECT{Right: 1000, Bottom: 1000}
+	rc := gdi32.RECT{Right: 1000, Bottom: 1000}
 
-	win.SendMessage(tw.hWndTab, win.TCM_ADJUSTRECT, 1, uintptr(unsafe.Pointer(&rc)))
+	user32.SendMessage(tw.hWndTab, commctrl.TCM_ADJUSTRECT, 1, uintptr(unsafe.Pointer(&rc)))
 
 	tw.nonClientSizePixels.Width = int(rc.Right-rc.Left) - 1000
 	tw.nonClientSizePixels.Height = int(rc.Bottom-rc.Top) - 1000

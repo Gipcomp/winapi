@@ -4,11 +4,9 @@
 
 // +build windows
 
-package walk
+package winapi
 
-import (
-	"github.com/lxn/win"
-)
+import "github.com/Gipcomp/win32/user32"
 
 type Separator struct {
 	WidgetBase
@@ -30,7 +28,7 @@ func newSeparator(parent Container, vertical bool) (*Separator, error) {
 		s,
 		parent,
 		"STATIC",
-		win.WS_VISIBLE|win.SS_ETCHEDHORZ,
+		user32.WS_VISIBLE|user32.SS_ETCHEDHORZ,
 		0); err != nil {
 		return nil, err
 	}

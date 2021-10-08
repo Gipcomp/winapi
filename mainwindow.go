@@ -4,12 +4,13 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
 )
 
 const mainWindowWindowClass = `\o/ Walk_MainWindow_Class \o/`
@@ -27,7 +28,7 @@ type MainWindowCfg struct {
 
 type MainWindow struct {
 	FormBase
-	windowPlacement *win.WINDOWPLACEMENT
+	windowPlacement *user32.WINDOWPLACEMENT
 	menu            *Menu
 	toolBar         *ToolBar
 	statusBar       *StatusBar
@@ -48,8 +49,8 @@ func NewMainWindowWithCfg(cfg *MainWindowCfg) (*MainWindow, error) {
 	if err := initWindowWithCfg(&windowCfg{
 		Window:    mw,
 		ClassName: mainWindowWindowClass,
-		Style:     win.WS_OVERLAPPEDWINDOW,
-		ExStyle:   win.WS_EX_CONTROLPARENT,
+		Style:     user32.WS_OVERLAPPEDWINDOW,
+		ExStyle:   user32.WS_EX_CONTROLPARENT,
 		Bounds:    cfg.Bounds,
 	}); err != nil {
 		return nil, err
@@ -69,7 +70,7 @@ func NewMainWindowWithCfg(cfg *MainWindowCfg) (*MainWindow, error) {
 	if mw.menu, err = newMenuBar(mw); err != nil {
 		return nil, err
 	}
-	if !win.SetMenu(mw.hWnd, mw.menu.hMenu) {
+	if !user32.SetMenu(mw.hWnd, mw.menu.hMenu) {
 		return nil, lastError("SetMenu")
 	}
 
@@ -85,7 +86,7 @@ func NewMainWindowWithCfg(cfg *MainWindowCfg) (*MainWindow, error) {
 	mw.statusBar.parent = nil
 	mw.Children().Remove(mw.statusBar)
 	mw.statusBar.parent = mw
-	win.SetParent(mw.statusBar.hWnd, mw.hWnd)
+	user32.SetParent(mw.statusBar.hWnd, mw.hWnd)
 	mw.statusBar.visibleChangedPublisher.event.Attach(func() {
 		mw.SetBoundsPixels(mw.BoundsPixels())
 	})
@@ -105,7 +106,7 @@ func (mw *MainWindow) ToolBar() *ToolBar {
 
 func (mw *MainWindow) SetToolBar(tb *ToolBar) {
 	if mw.toolBar != nil {
-		win.SetParent(mw.toolBar.hWnd, 0)
+		user32.SetParent(mw.toolBar.hWnd, 0)
 	}
 
 	if tb != nil {
@@ -113,7 +114,7 @@ func (mw *MainWindow) SetToolBar(tb *ToolBar) {
 		tb.parent = nil
 		parent.Children().Remove(tb)
 		tb.parent = mw
-		win.SetParent(tb.hWnd, mw.hWnd)
+		user32.SetParent(tb.hWnd, mw.hWnd)
 	}
 
 	mw.toolBar = tb
@@ -142,7 +143,7 @@ func (mw *MainWindow) ClientBoundsPixels() Rectangle {
 
 func (mw *MainWindow) SetVisible(visible bool) {
 	if visible {
-		win.DrawMenuBar(mw.hWnd)
+		user32.DrawMenuBar(mw.hWnd)
 
 		mw.clientComposite.RequestLayout()
 	}
@@ -163,7 +164,7 @@ func (mw *MainWindow) applyFont(font *Font) {
 }
 
 func (mw *MainWindow) Fullscreen() bool {
-	return win.GetWindowLong(mw.hWnd, win.GWL_STYLE)&win.WS_OVERLAPPEDWINDOW == 0
+	return user32.GetWindowLong(mw.hWnd, user32.GWL_STYLE)&user32.WS_OVERLAPPEDWINDOW == 0
 }
 
 func (mw *MainWindow) SetFullscreen(fullscreen bool) error {
@@ -172,44 +173,44 @@ func (mw *MainWindow) SetFullscreen(fullscreen bool) error {
 	}
 
 	if fullscreen {
-		var mi win.MONITORINFO
+		var mi user32.MONITORINFO
 		mi.CbSize = uint32(unsafe.Sizeof(mi))
 
 		if mw.windowPlacement == nil {
-			mw.windowPlacement = new(win.WINDOWPLACEMENT)
+			mw.windowPlacement = new(user32.WINDOWPLACEMENT)
 		}
 
-		if !win.GetWindowPlacement(mw.hWnd, mw.windowPlacement) {
+		if !user32.GetWindowPlacement(mw.hWnd, mw.windowPlacement) {
 			return lastError("GetWindowPlacement")
 		}
-		if !win.GetMonitorInfo(win.MonitorFromWindow(
-			mw.hWnd, win.MONITOR_DEFAULTTOPRIMARY), &mi) {
+		if !user32.GetMonitorInfo(user32.MonitorFromWindow(
+			mw.hWnd, user32.MONITOR_DEFAULTTOPRIMARY), &mi) {
 
 			return newError("GetMonitorInfo")
 		}
 
-		if err := mw.ensureStyleBits(win.WS_OVERLAPPEDWINDOW, false); err != nil {
+		if err := mw.ensureStyleBits(user32.WS_OVERLAPPEDWINDOW, false); err != nil {
 			return err
 		}
 
-		if r := mi.RcMonitor; !win.SetWindowPos(
-			mw.hWnd, win.HWND_TOP,
+		if r := mi.RcMonitor; !user32.SetWindowPos(
+			mw.hWnd, user32.HWND_TOP,
 			r.Left, r.Top, r.Right-r.Left, r.Bottom-r.Top,
-			win.SWP_FRAMECHANGED|win.SWP_NOOWNERZORDER) {
+			user32.SWP_FRAMECHANGED|user32.SWP_NOOWNERZORDER) {
 
 			return lastError("SetWindowPos")
 		}
 	} else {
-		if err := mw.ensureStyleBits(win.WS_OVERLAPPEDWINDOW, true); err != nil {
+		if err := mw.ensureStyleBits(user32.WS_OVERLAPPEDWINDOW, true); err != nil {
 			return err
 		}
 
-		if !win.SetWindowPlacement(mw.hWnd, mw.windowPlacement) {
+		if !user32.SetWindowPlacement(mw.hWnd, mw.windowPlacement) {
 			return lastError("SetWindowPlacement")
 		}
 
-		if !win.SetWindowPos(mw.hWnd, 0, 0, 0, 0, 0, win.SWP_FRAMECHANGED|win.SWP_NOMOVE|
-			win.SWP_NOOWNERZORDER|win.SWP_NOSIZE|win.SWP_NOZORDER) {
+		if !user32.SetWindowPos(mw.hWnd, 0, 0, 0, 0, 0, user32.SWP_FRAMECHANGED|user32.SWP_NOMOVE|
+			user32.SWP_NOOWNERZORDER|user32.SWP_NOSIZE|user32.SWP_NOZORDER) {
 
 			return lastError("SetWindowPos")
 		}
@@ -218,12 +219,12 @@ func (mw *MainWindow) SetFullscreen(fullscreen bool) error {
 	return nil
 }
 
-func (mw *MainWindow) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (mw *MainWindow) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_WINDOWPOSCHANGED, win.WM_SIZE:
-		if win.WM_WINDOWPOSCHANGED == msg {
-			wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
-			if wp.Flags&win.SWP_NOSIZE != 0 {
+	case user32.WM_WINDOWPOSCHANGED, user32.WM_SIZE:
+		if user32.WM_WINDOWPOSCHANGED == msg {
+			wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
+			if wp.Flags&user32.SWP_NOSIZE != 0 {
 				break
 			}
 		}
@@ -242,7 +243,7 @@ func (mw *MainWindow) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr)
 			mw.statusBar.SetBoundsPixels(bounds)
 		}
 
-	case win.WM_INITMENUPOPUP:
+	case user32.WM_INITMENUPOPUP:
 		mw.menu.updateItemsWithImageForWindow(mw)
 	}
 

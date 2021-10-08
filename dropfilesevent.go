@@ -4,12 +4,13 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/shell32"
 )
 
 type dropFilesEventHandlerInfo struct {
@@ -20,13 +21,13 @@ type dropFilesEventHandlerInfo struct {
 type DropFilesEventHandler func([]string)
 
 type DropFilesEvent struct {
-	hWnd     win.HWND
+	hWnd     handle.HWND
 	handlers []dropFilesEventHandlerInfo
 }
 
 func (e *DropFilesEvent) Attach(handler DropFilesEventHandler) int {
 	if len(e.handlers) == 0 {
-		win.DragAcceptFiles(e.hWnd, true)
+		shell32.DragAcceptFiles(e.hWnd, true)
 	}
 
 	handlerInfo := dropFilesEventHandlerInfo{handler, false}
@@ -52,7 +53,7 @@ func (e *DropFilesEvent) Detach(handle int) {
 		}
 	}
 
-	win.DragAcceptFiles(e.hWnd, false)
+	shell32.DragAcceptFiles(e.hWnd, false)
 }
 
 func (e *DropFilesEvent) Once(handler DropFilesEventHandler) {
@@ -64,23 +65,23 @@ type DropFilesEventPublisher struct {
 	event DropFilesEvent
 }
 
-func (p *DropFilesEventPublisher) Event(hWnd win.HWND) *DropFilesEvent {
+func (p *DropFilesEventPublisher) Event(hWnd handle.HWND) *DropFilesEvent {
 	p.event.hWnd = hWnd
 	return &p.event
 }
 
-func (p *DropFilesEventPublisher) Publish(hDrop win.HDROP) {
+func (p *DropFilesEventPublisher) Publish(hDrop shell32.HDROP) {
 	var files []string
 
-	n := win.DragQueryFile(hDrop, 0xFFFFFFFF, nil, 0)
+	n := shell32.DragQueryFile(hDrop, 0xFFFFFFFF, nil, 0)
 	for i := 0; i < int(n); i++ {
 		bufSize := uint(512)
 		buf := make([]uint16, bufSize)
-		if win.DragQueryFile(hDrop, uint(i), &buf[0], bufSize) > 0 {
+		if shell32.DragQueryFile(hDrop, uint(i), &buf[0], bufSize) > 0 {
 			files = append(files, syscall.UTF16ToString(buf))
 		}
 	}
-	win.DragFinish(hDrop)
+	shell32.DragFinish(hDrop)
 
 	for i, h := range p.event.handlers {
 		if h.handler != nil {

@@ -4,28 +4,30 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 const (
 	DlgCmdNone     = 0
-	DlgCmdOK       = win.IDOK
-	DlgCmdCancel   = win.IDCANCEL
-	DlgCmdAbort    = win.IDABORT
-	DlgCmdRetry    = win.IDRETRY
-	DlgCmdIgnore   = win.IDIGNORE
-	DlgCmdYes      = win.IDYES
-	DlgCmdNo       = win.IDNO
-	DlgCmdClose    = win.IDCLOSE
-	DlgCmdHelp     = win.IDHELP
-	DlgCmdTryAgain = win.IDTRYAGAIN
-	DlgCmdContinue = win.IDCONTINUE
-	DlgCmdTimeout  = win.IDTIMEOUT
+	DlgCmdOK       = user32.IDOK
+	DlgCmdCancel   = user32.IDCANCEL
+	DlgCmdAbort    = user32.IDABORT
+	DlgCmdRetry    = user32.IDRETRY
+	DlgCmdIgnore   = user32.IDIGNORE
+	DlgCmdYes      = user32.IDYES
+	DlgCmdNo       = user32.IDNO
+	DlgCmdClose    = user32.IDCLOSE
+	DlgCmdHelp     = user32.IDHELP
+	DlgCmdTryAgain = user32.IDTRYAGAIN
+	DlgCmdContinue = user32.IDCONTINUE
+	DlgCmdTimeout  = user32.IDTIMEOUT
 )
 
 const dialogWindowClass = `\o/ Walk_Dialog_Class \o/`
@@ -50,7 +52,7 @@ type Dialog struct {
 }
 
 func NewDialog(owner Form) (*Dialog, error) {
-	return newDialogWithStyle(owner, win.WS_THICKFRAME)
+	return newDialogWithStyle(owner, user32.WS_THICKFRAME)
 }
 
 func NewDialogWithFixedSize(owner Form) (*Dialog, error) {
@@ -68,7 +70,7 @@ func newDialogWithStyle(owner Form, style uint32) (*Dialog, error) {
 		dlg,
 		owner,
 		dialogWindowClass,
-		win.WS_CAPTION|win.WS_SYSMENU|style,
+		user32.WS_CAPTION|user32.WS_SYSMENU|style,
 		0); err != nil {
 		return nil, err
 	}
@@ -94,24 +96,24 @@ func (dlg *Dialog) DefaultButton() *PushButton {
 }
 
 func (dlg *Dialog) SetDefaultButton(button *PushButton) error {
-	if button != nil && !win.IsChild(dlg.hWnd, button.hWnd) {
+	if button != nil && !user32.IsChild(dlg.hWnd, button.hWnd) {
 		return newError("not a descendant of the dialog")
 	}
 
 	succeeded := false
 	if dlg.defaultButton != nil {
-		if err := dlg.defaultButton.setAndClearStyleBits(win.BS_PUSHBUTTON, win.BS_DEFPUSHBUTTON); err != nil {
+		if err := dlg.defaultButton.setAndClearStyleBits(user32.BS_PUSHBUTTON, user32.BS_DEFPUSHBUTTON); err != nil {
 			return err
 		}
 		defer func() {
 			if !succeeded {
-				dlg.defaultButton.setAndClearStyleBits(win.BS_DEFPUSHBUTTON, win.BS_PUSHBUTTON)
+				dlg.defaultButton.setAndClearStyleBits(user32.BS_DEFPUSHBUTTON, user32.BS_PUSHBUTTON)
 			}
 		}()
 	}
 
 	if button != nil {
-		if err := button.setAndClearStyleBits(win.BS_DEFPUSHBUTTON, win.BS_PUSHBUTTON); err != nil {
+		if err := button.setAndClearStyleBits(user32.BS_DEFPUSHBUTTON, user32.BS_PUSHBUTTON); err != nil {
 			return err
 		}
 	}
@@ -128,7 +130,7 @@ func (dlg *Dialog) CancelButton() *PushButton {
 }
 
 func (dlg *Dialog) SetCancelButton(button *PushButton) error {
-	if button != nil && !win.IsChild(dlg.hWnd, button.hWnd) {
+	if button != nil && !user32.IsChild(dlg.hWnd, button.hWnd) {
 		return newError("not a descendant of the dialog")
 	}
 
@@ -194,20 +196,20 @@ func (dlg *Dialog) Show() {
 }
 
 // fitRectToScreen fits rectangle to screen. Input and output rectangles are in native pixels.
-func fitRectToScreen(hWnd win.HWND, r Rectangle) Rectangle {
-	var mi win.MONITORINFO
+func fitRectToScreen(hWnd handle.HWND, r Rectangle) Rectangle {
+	var mi user32.MONITORINFO
 	mi.CbSize = uint32(unsafe.Sizeof(mi))
 
-	if !win.GetMonitorInfo(win.MonitorFromWindow(
-		hWnd, win.MONITOR_DEFAULTTOPRIMARY), &mi) {
+	if !user32.GetMonitorInfo(user32.MonitorFromWindow(
+		hWnd, user32.MONITOR_DEFAULTTOPRIMARY), &mi) {
 
 		return r
 	}
 
 	mon := rectangleFromRECT(mi.RcWork)
 
-	dpi := win.GetDpiForWindow(hWnd)
-	mon.Height -= int(win.GetSystemMetricsForDpi(win.SM_CYCAPTION, dpi))
+	dpi := user32.GetDpiForWindow(hWnd)
+	mon.Height -= int(user32.GetSystemMetricsForDpi(user32.SM_CYCAPTION, dpi))
 
 	if r.Width <= mon.Width {
 		switch {
@@ -238,9 +240,9 @@ func (dlg *Dialog) Run() int {
 	return dlg.result
 }
 
-func (dlg *Dialog) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (dlg *Dialog) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_COMMAND:
+	case user32.WM_COMMAND:
 		if win.HIWORD(uint32(wParam)) == 0 {
 			switch win.LOWORD(uint32(wParam)) {
 			case DlgCmdOK:

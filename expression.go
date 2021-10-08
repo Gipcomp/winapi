@@ -4,14 +4,14 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"log"
 	"reflect"
-)
 
-import _ "gopkg.in/Knetic/govaluate.v3"
+	_ "gopkg.in/Knetic/govaluate.v3"
+)
 
 type Expression interface {
 	Value() interface{}

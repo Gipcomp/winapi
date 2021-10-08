@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"fmt"
@@ -15,7 +15,12 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/helpers"
 )
 
 type ComboBox struct {
@@ -52,11 +57,11 @@ func init() {
 	})
 }
 
-func comboBoxEditWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
-	cb := (*ComboBox)(unsafe.Pointer(win.GetWindowLongPtr(hwnd, win.GWLP_USERDATA)))
+func comboBoxEditWndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+	cb := (*ComboBox)(unsafe.Pointer(user32.GetWindowLongPtr(hwnd, user32.GWLP_USERDATA)))
 
 	switch msg {
-	case win.WM_GETDLGCODE:
+	case user32.WM_GETDLGCODE:
 		if !cb.editing {
 			if form := ancestor(cb); form != nil {
 				if dlg, ok := form.(dialogish); ok {
@@ -69,53 +74,53 @@ func comboBoxEditWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uint
 			}
 		}
 
-		if wParam == win.VK_RETURN {
-			return win.DLGC_WANTALLKEYS
+		if wParam == user32.VK_RETURN {
+			return user32.DLGC_WANTALLKEYS
 		}
 
-	case win.WM_KEYDOWN:
-		if wParam != win.VK_RETURN || 0 == cb.SendMessage(win.CB_GETDROPPEDSTATE, 0, 0) {
+	case user32.WM_KEYDOWN:
+		if wParam != user32.VK_RETURN || cb.SendMessage(commctrl.CB_GETDROPPEDSTATE, 0, 0) == 0 {
 			cb.handleKeyDown(wParam, lParam)
 		}
 
-		if cb.editing && wParam == win.VK_RETURN {
+		if cb.editing && wParam == user32.VK_RETURN {
 			cb.editing = false
 			cb.editingFinishedPublisher.Publish()
 		}
 
-	case win.WM_KEYUP:
-		if wParam != win.VK_RETURN || 0 == cb.SendMessage(win.CB_GETDROPPEDSTATE, 0, 0) {
+	case user32.WM_KEYUP:
+		if wParam != user32.VK_RETURN || cb.SendMessage(commctrl.CB_GETDROPPEDSTATE, 0, 0) == 0 {
 			cb.handleKeyUp(wParam, lParam)
 		}
 
-	case win.WM_SETFOCUS, win.WM_KILLFOCUS:
+	case user32.WM_SETFOCUS, user32.WM_KILLFOCUS:
 		cb.invalidateBorderInParent()
 
-		if cb.editing && msg == win.WM_KILLFOCUS {
+		if cb.editing && msg == user32.WM_KILLFOCUS {
 			cb.editing = false
 			cb.editingFinishedPublisher.Publish()
 		}
 	}
 
-	return win.CallWindowProc(cb.editOrigWndProcPtr, hwnd, msg, wParam, lParam)
+	return user32.CallWindowProc(cb.editOrigWndProcPtr, hwnd, msg, wParam, lParam)
 }
 
 func NewComboBox(parent Container) (*ComboBox, error) {
-	cb, err := newComboBoxWithStyle(parent, win.CBS_AUTOHSCROLL|win.CBS_DROPDOWN)
+	cb, err := newComboBoxWithStyle(parent, commctrl.CBS_AUTOHSCROLL|commctrl.CBS_DROPDOWN)
 	if err != nil {
 		return nil, err
 	}
 
-	editHwnd := win.GetWindow(cb.hWnd, win.GW_CHILD)
+	editHwnd := user32.GetWindow(cb.hWnd, user32.GW_CHILD)
 
-	win.SetWindowLongPtr(editHwnd, win.GWLP_USERDATA, uintptr(unsafe.Pointer(cb)))
-	cb.editOrigWndProcPtr = win.SetWindowLongPtr(editHwnd, win.GWLP_WNDPROC, comboBoxEditWndProcPtr)
+	user32.SetWindowLongPtr(editHwnd, user32.GWLP_USERDATA, uintptr(unsafe.Pointer(cb)))
+	cb.editOrigWndProcPtr = user32.SetWindowLongPtr(editHwnd, user32.GWLP_WNDPROC, comboBoxEditWndProcPtr)
 
 	return cb, nil
 }
 
 func NewDropDownBox(parent Container) (*ComboBox, error) {
-	return newComboBoxWithStyle(parent, win.CBS_DROPDOWNLIST)
+	return newComboBoxWithStyle(parent, commctrl.CBS_DROPDOWNLIST)
 }
 
 func newComboBoxWithStyle(parent Container, style uint32) (*ComboBox, error) {
@@ -125,7 +130,7 @@ func newComboBoxWithStyle(parent Container, style uint32) (*ComboBox, error) {
 		cb,
 		parent,
 		"COMBOBOX",
-		win.WS_TABSTOP|win.WS_VISIBLE|win.WS_VSCROLL|style,
+		user32.WS_TABSTOP|user32.WS_VISIBLE|user32.WS_VSCROLL|style,
 		0); err != nil {
 		return nil, err
 	}
@@ -138,7 +143,7 @@ func newComboBoxWithStyle(parent Container, style uint32) (*ComboBox, error) {
 	}()
 
 	var event *Event
-	if style&win.CBS_DROPDOWNLIST == win.CBS_DROPDOWNLIST {
+	if style&commctrl.CBS_DROPDOWNLIST == commctrl.CBS_DROPDOWNLIST {
 		event = cb.CurrentIndexChanged()
 	} else {
 		event = cb.TextChanged()
@@ -245,7 +250,7 @@ func (cb *ComboBox) applyFont(font *Font) {
 }
 
 func (cb *ComboBox) Editable() bool {
-	return !cb.hasStyleBits(win.CBS_DROPDOWNLIST)
+	return !cb.hasStyleBits(commctrl.CBS_DROPDOWNLIST)
 }
 
 func (cb *ComboBox) itemString(index int) string {
@@ -268,9 +273,10 @@ func (cb *ComboBox) itemString(index int) string {
 
 func (cb *ComboBox) insertItemAt(index int) error {
 	str := cb.itemString(index)
-	lp := uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(str)))
+	strPtr, _ := syscall.UTF16PtrFromString(str)
+	lp := uintptr(unsafe.Pointer(strPtr))
 
-	if win.CB_ERR == cb.SendMessage(win.CB_INSERTSTRING, uintptr(index), lp) {
+	if commctrl.CB_ERR == cb.SendMessage(commctrl.CB_INSERTSTRING, uintptr(index), lp) {
 		return newError("SendMessage(CB_INSERTSTRING)")
 	}
 
@@ -278,7 +284,7 @@ func (cb *ComboBox) insertItemAt(index int) error {
 }
 
 func (cb *ComboBox) removeItem(index int) error {
-	if win.CB_ERR == cb.SendMessage(win.CB_DELETESTRING, uintptr(index), 0) {
+	if commctrl.CB_ERR == cb.SendMessage(commctrl.CB_DELETESTRING, uintptr(index), 0) {
 		return newError("SendMessage(CB_DELETESTRING")
 	}
 
@@ -291,7 +297,7 @@ func (cb *ComboBox) resetItems() error {
 
 	cb.selChangeIndex = -1
 
-	if win.FALSE == cb.SendMessage(win.CB_RESETCONTENT, 0, 0) {
+	if win.FALSE == cb.SendMessage(commctrl.CB_RESETCONTENT, 0, 0) {
 		return newError("SendMessage(CB_RESETCONTENT)")
 	}
 
@@ -330,7 +336,7 @@ func (cb *ComboBox) attachModel() {
 	cb.itemsResetHandlerHandle = cb.model.ItemsReset().Attach(itemsResetHandler)
 
 	itemChangedHandler := func(index int) {
-		if win.CB_ERR == cb.SendMessage(win.CB_DELETESTRING, uintptr(index), 0) {
+		if commctrl.CB_ERR == cb.SendMessage(commctrl.CB_DELETESTRING, uintptr(index), 0) {
 			newError("SendMessage(CB_DELETESTRING)")
 		}
 
@@ -517,31 +523,33 @@ func (cb *ComboBox) MaxLength() int {
 }
 
 func (cb *ComboBox) SetMaxLength(value int) {
-	cb.SendMessage(win.CB_LIMITTEXT, uintptr(value), 0)
+	cb.SendMessage(commctrl.CB_LIMITTEXT, uintptr(value), 0)
 
 	cb.maxLength = value
 }
 
 // calculateMaxItemTextWidth returns maximum item text width in native pixels.
 func (cb *ComboBox) calculateMaxItemTextWidth() int {
-	hdc := win.GetDC(cb.hWnd)
+	hdc := user32.GetDC(cb.hWnd)
 	if hdc == 0 {
 		newError("GetDC failed")
 		return -1
 	}
-	defer win.ReleaseDC(cb.hWnd, hdc)
+	defer user32.ReleaseDC(cb.hWnd, hdc)
 
-	hFontOld := win.SelectObject(hdc, win.HGDIOBJ(cb.Font().handleForDPI(cb.DPI())))
-	defer win.SelectObject(hdc, hFontOld)
+	hFontOld := gdi32.SelectObject(hdc, gdi32.HGDIOBJ(cb.Font().handleForDPI(cb.DPI())))
+	defer gdi32.SelectObject(hdc, hFontOld)
 
 	var maxWidth int
 
 	count := cb.model.ItemCount()
 	for i := 0; i < count; i++ {
-		var s win.SIZE
-		str := syscall.StringToUTF16(cb.itemString(i))
+		var s gdi32.SIZE
+		str, _ := syscall.UTF16PtrFromString(cb.itemString(i))
+		//str := syscall.StringToUTF16(cb.itemString(i))
 
-		if !win.GetTextExtentPoint32(hdc, &str[0], int32(len(str)-1), &s) {
+		// if !gdi32.GetTextExtentPoint32(hdc, &str[0], int32(len(str)-1), &s) {
+		if !gdi32.GetTextExtentPoint32(hdc, str, int32(len(helpers.UINT16PtrToString(str))), &s) {
 			newError("GetTextExtentPoint32 failed")
 			return -1
 		}
@@ -553,11 +561,11 @@ func (cb *ComboBox) calculateMaxItemTextWidth() int {
 }
 
 func (cb *ComboBox) CurrentIndex() int {
-	return int(int32(cb.SendMessage(win.CB_GETCURSEL, 0, 0)))
+	return int(int32(cb.SendMessage(commctrl.CB_GETCURSEL, 0, 0)))
 }
 
 func (cb *ComboBox) SetCurrentIndex(value int) error {
-	index := int(int32(cb.SendMessage(win.CB_SETCURSEL, uintptr(value), 0)))
+	index := int(int32(cb.SendMessage(commctrl.CB_SETCURSEL, uintptr(value), 0)))
 
 	if index != value {
 		return newError("invalid index")
@@ -607,12 +615,12 @@ func (cb *ComboBox) SetText(value string) error {
 }
 
 func (cb *ComboBox) TextSelection() (start, end int) {
-	cb.SendMessage(win.CB_GETEDITSEL, uintptr(unsafe.Pointer(&start)), uintptr(unsafe.Pointer(&end)))
+	cb.SendMessage(commctrl.CB_GETEDITSEL, uintptr(unsafe.Pointer(&start)), uintptr(unsafe.Pointer(&end)))
 	return
 }
 
 func (cb *ComboBox) SetTextSelection(start, end int) {
-	cb.SendMessage(win.CB_SETEDITSEL, 0, uintptr(win.MAKELONG(uint16(start), uint16(end))))
+	cb.SendMessage(commctrl.CB_SETEDITSEL, 0, uintptr(win.MAKELONG(uint16(start), uint16(end))))
 }
 
 func (cb *ComboBox) TextChanged() *Event {
@@ -653,23 +661,23 @@ func (cb *ComboBox) RestoreState() error {
 	return nil
 }
 
-func (cb *ComboBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (cb *ComboBox) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_COMMAND:
+	case user32.WM_COMMAND:
 		code := win.HIWORD(uint32(wParam))
 		selIndex := cb.CurrentIndex()
 
 		switch code {
-		case win.CBN_EDITCHANGE:
+		case commctrl.CBN_EDITCHANGE:
 			cb.editing = true
 			cb.selChangeIndex = -1
 			cb.textChangedPublisher.Publish()
 
-		case win.CBN_SELCHANGE:
+		case commctrl.CBN_SELCHANGE:
 			cb.selChangeIndex = selIndex
 			cb.currentIndexChangedPublisher.Publish()
 
-		case win.CBN_SELENDCANCEL:
+		case commctrl.CBN_SELENDCANCEL:
 			if cb.selChangeIndex != -1 {
 				if cb.selChangeIndex < cb.model.ItemCount() {
 					cb.SetCurrentIndex(cb.selChangeIndex)
@@ -678,7 +686,7 @@ func (cb *ComboBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) u
 				cb.selChangeIndex = -1
 			}
 
-		case win.CBN_SELENDOK:
+		case commctrl.CBN_SELENDOK:
 			if editable := cb.Editable(); editable || selIndex != cb.prevCurIndex {
 				valueProp := cb.Property("Value")
 				if editable && selIndex > -1 {
@@ -694,15 +702,15 @@ func (cb *ComboBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) u
 			cb.selChangeIndex = -1
 		}
 
-	case win.WM_MOUSEWHEEL:
+	case user32.WM_MOUSEWHEEL:
 		if !cb.Enabled() {
 			return 0
 		}
 
-	case win.WM_WINDOWPOSCHANGED:
-		wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
+	case user32.WM_WINDOWPOSCHANGED:
+		wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
 
-		if wp.Flags&win.SWP_NOSIZE != 0 {
+		if wp.Flags&user32.SWP_NOSIZE != 0 {
 			break
 		}
 
@@ -737,7 +745,7 @@ func (cb *ComboBox) CreateLayoutItem(ctx *LayoutContext) LayoutItem {
 	}
 
 	// FIXME: Use GetThemePartSize instead of guessing
-	w := maxi(defaultSize.Width, cb.maxItemTextWidth+int(win.GetSystemMetricsForDpi(win.SM_CXVSCROLL, uint32(ctx.dpi)))+8)
+	w := maxi(defaultSize.Width, cb.maxItemTextWidth+int(user32.GetSystemMetricsForDpi(user32.SM_CXVSCROLL, uint32(ctx.dpi)))+8)
 	h := defaultSize.Height + 1
 
 	return &comboBoxLayoutItem{

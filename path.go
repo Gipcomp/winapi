@@ -4,18 +4,19 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/shell32"
 )
 
-func knownFolderPath(id win.CSIDL) (string, error) {
-	var buf [win.MAX_PATH]uint16
+func knownFolderPath(id shell32.CSIDL) (string, error) {
+	var buf [kernel32.MAX_PATH]uint16
 
-	if !win.SHGetSpecialFolderPath(0, &buf[0], id, false) {
+	if !shell32.SHGetSpecialFolderPath(0, &buf[0], id, false) {
 		return "", newError("SHGetSpecialFolderPath failed")
 	}
 
@@ -23,33 +24,33 @@ func knownFolderPath(id win.CSIDL) (string, error) {
 }
 
 func AppDataPath() (string, error) {
-	return knownFolderPath(win.CSIDL_APPDATA)
+	return knownFolderPath(shell32.CSIDL_APPDATA)
 }
 
 func CommonAppDataPath() (string, error) {
-	return knownFolderPath(win.CSIDL_COMMON_APPDATA)
+	return knownFolderPath(shell32.CSIDL_COMMON_APPDATA)
 }
 
 func LocalAppDataPath() (string, error) {
-	return knownFolderPath(win.CSIDL_LOCAL_APPDATA)
+	return knownFolderPath(shell32.CSIDL_LOCAL_APPDATA)
 }
 
 func PersonalPath() (string, error) {
-	return knownFolderPath(win.CSIDL_PERSONAL)
+	return knownFolderPath(shell32.CSIDL_PERSONAL)
 }
 
 func SystemPath() (string, error) {
-	return knownFolderPath(win.CSIDL_SYSTEM)
+	return knownFolderPath(shell32.CSIDL_SYSTEM)
 }
 
 func DriveNames() ([]string, error) {
-	bufLen := win.GetLogicalDriveStrings(0, nil)
+	bufLen := kernel32.GetLogicalDriveStrings(0, nil)
 	if bufLen == 0 {
 		return nil, lastError("GetLogicalDriveStrings")
 	}
 	buf := make([]uint16, bufLen+1)
 
-	bufLen = win.GetLogicalDriveStrings(bufLen+1, &buf[0])
+	bufLen = kernel32.GetLogicalDriveStrings(bufLen+1, &buf[0])
 	if bufLen == 0 {
 		return nil, lastError("GetLogicalDriveStrings")
 	}

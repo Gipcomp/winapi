@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 const spacerWindowClass = `\o/ Walk_Spacer_Class \o/`
 

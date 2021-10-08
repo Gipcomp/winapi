@@ -4,13 +4,16 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
 )
 
 const staticWindowClass = `\o/ Walk_Static_Class \o/`
@@ -26,7 +29,7 @@ func init() {
 
 type static struct {
 	WidgetBase
-	hwndStatic           win.HWND
+	hwndStatic           handle.HWND
 	origStaticWndProcPtr uintptr
 	textAlignment        Alignment2D
 	textColor            Color
@@ -37,20 +40,23 @@ func (s *static) init(widget Widget, parent Container, style uint32) error {
 		widget,
 		parent,
 		staticWindowClass,
-		win.WS_VISIBLE|(style&win.WS_BORDER),
-		win.WS_EX_CONTROLPARENT); err != nil {
+		user32.WS_VISIBLE|(style&user32.WS_BORDER),
+		user32.WS_EX_CONTROLPARENT); err != nil {
 		return err
 	}
-
-	if s.hwndStatic = win.CreateWindowEx(
+	strPtr, err := syscall.UTF16PtrFromString("static")
+	if err != nil {
+		return err
+	}
+	if s.hwndStatic = user32.CreateWindowEx(
 		0,
-		syscall.StringToUTF16Ptr("static"),
+		strPtr,
 		nil,
-		win.WS_CHILD|win.WS_CLIPSIBLINGS|win.WS_VISIBLE|win.SS_LEFT|win.SS_NOTIFY|(style&^win.WS_BORDER),
-		win.CW_USEDEFAULT,
-		win.CW_USEDEFAULT,
-		win.CW_USEDEFAULT,
-		win.CW_USEDEFAULT,
+		user32.WS_CHILD|user32.WS_CLIPSIBLINGS|user32.WS_VISIBLE|user32.SS_LEFT|user32.SS_NOTIFY|(style&^user32.WS_BORDER),
+		user32.CW_USEDEFAULT,
+		user32.CW_USEDEFAULT,
+		user32.CW_USEDEFAULT,
+		user32.CW_USEDEFAULT,
 		s.hWnd,
 		0,
 		0,
@@ -63,7 +69,7 @@ func (s *static) init(widget Widget, parent Container, style uint32) error {
 		return err
 	}
 
-	s.origStaticWndProcPtr = win.SetWindowLongPtr(s.hwndStatic, win.GWLP_WNDPROC, staticWndProcPtr)
+	s.origStaticWndProcPtr = user32.SetWindowLongPtr(s.hwndStatic, user32.GWLP_WNDPROC, staticWndProcPtr)
 	if s.origStaticWndProcPtr == 0 {
 		return lastError("SetWindowLongPtr")
 	}
@@ -79,14 +85,14 @@ func (s *static) init(widget Widget, parent Container, style uint32) error {
 
 func (s *static) Dispose() {
 	if s.hwndStatic != 0 {
-		win.DestroyWindow(s.hwndStatic)
+		user32.DestroyWindow(s.hwndStatic)
 		s.hwndStatic = 0
 	}
 
 	s.WidgetBase.Dispose()
 }
 
-func (s *static) handleForToolTip() win.HWND {
+func (s *static) handleForToolTip() handle.HWND {
 	return s.hwndStatic
 }
 
@@ -141,16 +147,16 @@ func (s *static) setTextAlignment(alignment Alignment2D) error {
 
 	switch alignment {
 	case AlignHNearVNear, AlignHNearVCenter, AlignHNearVFar:
-		styleBit |= win.SS_LEFT
+		styleBit |= user32.SS_LEFT
 
 	case AlignHCenterVNear, AlignHCenterVCenter, AlignHCenterVFar:
-		styleBit |= win.SS_CENTER
+		styleBit |= user32.SS_CENTER
 
 	case AlignHFarVNear, AlignHFarVCenter, AlignHFarVFar:
-		styleBit |= win.SS_RIGHT
+		styleBit |= user32.SS_RIGHT
 	}
 
-	if err := setAndClearWindowLongBits(s.hwndStatic, win.GWL_STYLE, styleBit, win.SS_LEFT|win.SS_CENTER|win.SS_RIGHT); err != nil {
+	if err := setAndClearWindowLongBits(s.hwndStatic, user32.GWL_STYLE, styleBit, user32.SS_LEFT|user32.SS_CENTER|user32.SS_RIGHT); err != nil {
 		return err
 	}
 
@@ -251,22 +257,22 @@ func (s *static) updateStaticBounds() {
 		}
 	}
 
-	win.MoveWindow(s.hwndStatic, int32(cb.X), int32(cb.Y), int32(cb.Width), int32(cb.Height), true)
+	user32.MoveWindow(s.hwndStatic, int32(cb.X), int32(cb.Y), int32(cb.Width), int32(cb.Height), true)
 
 	s.Invalidate()
 }
 
-func (s *static) WndProc(hwnd win.HWND, msg uint32, wp, lp uintptr) uintptr {
+func (s *static) WndProc(hwnd handle.HWND, msg uint32, wp, lp uintptr) uintptr {
 	switch msg {
-	case win.WM_CTLCOLORSTATIC:
+	case user32.WM_CTLCOLORSTATIC:
 		if hBrush := s.handleWMCTLCOLOR(wp, uintptr(s.hWnd)); hBrush != 0 {
 			return hBrush
 		}
 
-	case win.WM_WINDOWPOSCHANGED:
-		wp := (*win.WINDOWPOS)(unsafe.Pointer(lp))
+	case user32.WM_WINDOWPOSCHANGED:
+		wp := (*user32.WINDOWPOS)(unsafe.Pointer(lp))
 
-		if wp.Flags&win.SWP_NOSIZE != 0 {
+		if wp.Flags&user32.SWP_NOSIZE != 0 {
 			break
 		}
 
@@ -276,8 +282,8 @@ func (s *static) WndProc(hwnd win.HWND, msg uint32, wp, lp uintptr) uintptr {
 	return s.WidgetBase.WndProc(hwnd, msg, wp, lp)
 }
 
-func staticWndProc(hwnd win.HWND, msg uint32, wp, lp uintptr) uintptr {
-	as, ok := windowFromHandle(win.GetParent(hwnd)).(interface{ asStatic() *static })
+func staticWndProc(hwnd handle.HWND, msg uint32, wp, lp uintptr) uintptr {
+	as, ok := windowFromHandle(user32.GetParent(hwnd)).(interface{ asStatic() *static })
 	if !ok {
 		return 0
 	}
@@ -285,22 +291,22 @@ func staticWndProc(hwnd win.HWND, msg uint32, wp, lp uintptr) uintptr {
 	s := as.asStatic()
 
 	switch msg {
-	case win.WM_NCHITTEST:
-		return win.HTCLIENT
+	case user32.WM_NCHITTEST:
+		return user32.HTCLIENT
 
-	case win.WM_MOUSEMOVE, win.WM_LBUTTONDOWN, win.WM_LBUTTONUP, win.WM_MBUTTONDOWN, win.WM_MBUTTONUP, win.WM_RBUTTONDOWN, win.WM_RBUTTONUP:
-		m := win.MSG{
+	case user32.WM_MOUSEMOVE, user32.WM_LBUTTONDOWN, user32.WM_LBUTTONUP, user32.WM_MBUTTONDOWN, user32.WM_MBUTTONUP, user32.WM_RBUTTONDOWN, user32.WM_RBUTTONUP:
+		m := user32.MSG{
 			HWnd:    hwnd,
 			Message: msg,
 			WParam:  wp,
 			LParam:  lp,
-			Pt:      win.POINT{int32(win.GET_X_LPARAM(lp)), int32(win.GET_Y_LPARAM(lp))},
+			Pt:      gdi32.POINT{X: int32(user32.GET_X_LPARAM(lp)), Y: int32(user32.GET_Y_LPARAM(lp))},
 		}
 
-		return s.group.toolTip.SendMessage(win.TTM_RELAYEVENT, 0, uintptr(unsafe.Pointer(&m)))
+		return s.group.toolTip.SendMessage(commctrl.TTM_RELAYEVENT, 0, uintptr(unsafe.Pointer(&m)))
 	}
 
-	return win.CallWindowProc(s.origStaticWndProcPtr, hwnd, msg, wp, lp)
+	return user32.CallWindowProc(s.origStaticWndProcPtr, hwnd, msg, wp, lp)
 }
 
 func (s *static) CreateLayoutItem(ctx *LayoutContext) LayoutItem {
@@ -312,7 +318,7 @@ func (s *static) CreateLayoutItem(ctx *LayoutContext) LayoutItem {
 	}
 
 	idealSize := s.calculateTextSize()
-	if s.hasStyleBits(win.WS_BORDER) {
+	if s.hasStyleBits(user32.WS_BORDER) {
 		border := s.IntFrom96DPI(1) * 2
 		idealSize.Width += border
 		idealSize.Height += border * 2

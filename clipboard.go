@@ -4,13 +4,16 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 const clipboardWindowClass = `\o/ Walk_Clipboard_Class \o/`
@@ -18,17 +21,17 @@ const clipboardWindowClass = `\o/ Walk_Clipboard_Class \o/`
 func init() {
 	AppendToWalkInit(func() {
 		MustRegisterWindowClassWithWndProcPtr(clipboardWindowClass, syscall.NewCallback(clipboardWndProc))
-
-		hwnd := win.CreateWindowEx(
+		lpClassName, _ := syscall.UTF16PtrFromString(clipboardWindowClass)
+		hwnd := user32.CreateWindowEx(
 			0,
-			syscall.StringToUTF16Ptr(clipboardWindowClass),
+			lpClassName,
 			nil,
 			0,
 			0,
 			0,
 			0,
 			0,
-			win.HWND_MESSAGE,
+			user32.HWND_MESSAGE,
 			0,
 			0,
 			nil)
@@ -37,7 +40,7 @@ func init() {
 			panic("failed to create clipboard window")
 		}
 
-		if !win.AddClipboardFormatListener(hwnd) {
+		if !user32.AddClipboardFormatListener(hwnd) {
 			lastError("AddClipboardFormatListener")
 		}
 
@@ -45,14 +48,14 @@ func init() {
 	})
 }
 
-func clipboardWndProc(hwnd win.HWND, msg uint32, wp, lp uintptr) uintptr {
+func clipboardWndProc(hwnd handle.HWND, msg uint32, wp, lp uintptr) uintptr {
 	switch msg {
-	case win.WM_CLIPBOARDUPDATE:
+	case user32.WM_CLIPBOARDUPDATE:
 		clipboard.contentsChangedPublisher.Publish()
 		return 0
 	}
 
-	return win.DefWindowProc(hwnd, msg, wp, lp)
+	return user32.DefWindowProc(hwnd, msg, wp, lp)
 }
 
 var clipboard ClipboardService
@@ -64,7 +67,7 @@ func Clipboard() *ClipboardService {
 
 // ClipboardService provides access to the system clipboard.
 type ClipboardService struct {
-	hwnd                     win.HWND
+	hwnd                     handle.HWND
 	contentsChangedPublisher EventPublisher
 }
 
@@ -77,7 +80,7 @@ func (c *ClipboardService) ContentsChanged() *Event {
 // Clear clears the contents of the clipboard.
 func (c *ClipboardService) Clear() error {
 	return c.withOpenClipboard(func() error {
-		if !win.EmptyClipboard() {
+		if !user32.EmptyClipboard() {
 			return lastError("EmptyClipboard")
 		}
 
@@ -88,7 +91,7 @@ func (c *ClipboardService) Clear() error {
 // ContainsText returns whether the clipboard currently contains text data.
 func (c *ClipboardService) ContainsText() (available bool, err error) {
 	err = c.withOpenClipboard(func() error {
-		available = win.IsClipboardFormatAvailable(win.CF_UNICODETEXT)
+		available = user32.IsClipboardFormatAvailable(user32.CF_UNICODETEXT)
 
 		return nil
 	})
@@ -99,16 +102,16 @@ func (c *ClipboardService) ContainsText() (available bool, err error) {
 // Text returns the current text data of the clipboard.
 func (c *ClipboardService) Text() (text string, err error) {
 	err = c.withOpenClipboard(func() error {
-		hMem := win.HGLOBAL(win.GetClipboardData(win.CF_UNICODETEXT))
+		hMem := kernel32.HGLOBAL(user32.GetClipboardData(user32.CF_UNICODETEXT))
 		if hMem == 0 {
 			return lastError("GetClipboardData")
 		}
 
-		p := win.GlobalLock(hMem)
+		p := kernel32.GlobalLock(hMem)
 		if p == nil {
 			return lastError("GlobalLock()")
 		}
-		defer win.GlobalUnlock(hMem)
+		defer kernel32.GlobalUnlock(hMem)
 
 		text = win.UTF16PtrToString((*uint16)(p))
 
@@ -126,23 +129,23 @@ func (c *ClipboardService) SetText(s string) error {
 			return err
 		}
 
-		hMem := win.GlobalAlloc(win.GMEM_MOVEABLE, uintptr(len(utf16)*2))
+		hMem := kernel32.GlobalAlloc(kernel32.GMEM_MOVEABLE, uintptr(len(utf16)*2))
 		if hMem == 0 {
 			return lastError("GlobalAlloc")
 		}
 
-		p := win.GlobalLock(hMem)
+		p := kernel32.GlobalLock(hMem)
 		if p == nil {
 			return lastError("GlobalLock()")
 		}
 
-		win.MoveMemory(p, unsafe.Pointer(&utf16[0]), uintptr(len(utf16)*2))
+		kernel32.MoveMemory(p, unsafe.Pointer(&utf16[0]), uintptr(len(utf16)*2))
 
-		win.GlobalUnlock(hMem)
+		kernel32.GlobalUnlock(hMem)
 
-		if 0 == win.SetClipboardData(win.CF_UNICODETEXT, win.HANDLE(hMem)) {
+		if user32.SetClipboardData(user32.CF_UNICODETEXT, handle.HANDLE(hMem)) == 0 {
 			// We need to free hMem.
-			defer win.GlobalFree(hMem)
+			defer kernel32.GlobalFree(hMem)
 
 			return lastError("SetClipboardData")
 		}
@@ -154,10 +157,10 @@ func (c *ClipboardService) SetText(s string) error {
 }
 
 func (c *ClipboardService) withOpenClipboard(f func() error) error {
-	if !win.OpenClipboard(c.hwnd) {
+	if !user32.OpenClipboard(c.hwnd) {
 		return lastError("OpenClipboard")
 	}
-	defer win.CloseClipboard()
+	defer user32.CloseClipboard()
 
 	return f()
 }

@@ -4,12 +4,16 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"strconv"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/comctl32"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 type Slider struct {
@@ -36,15 +40,15 @@ func NewSliderWithOrientation(parent Container, orientation Orientation) (*Slide
 func NewSliderWithCfg(parent Container, cfg *SliderCfg) (*Slider, error) {
 	sl := new(Slider)
 
-	var style uint32 = win.WS_TABSTOP | win.WS_VISIBLE
+	var style uint32 = user32.WS_TABSTOP | user32.WS_VISIBLE
 	if cfg.Orientation == Vertical {
-		style |= win.TBS_VERT
+		style |= comctl32.TBS_VERT
 		sl.layoutFlags = ShrinkableVert | GrowableVert
 	} else {
 		sl.layoutFlags = ShrinkableHorz | GrowableHorz
 	}
 	if !cfg.ToolTipsHidden {
-		style |= win.TBS_TOOLTIPS
+		style |= comctl32.TBS_TOOLTIPS
 	}
 
 	if err := InitWidget(
@@ -75,24 +79,24 @@ func NewSliderWithCfg(parent Container, cfg *SliderCfg) (*Slider, error) {
 }
 
 func (sl *Slider) MinValue() int {
-	return int(sl.SendMessage(win.TBM_GETRANGEMIN, 0, 0))
+	return int(sl.SendMessage(comctl32.TBM_GETRANGEMIN, 0, 0))
 }
 
 func (sl *Slider) MaxValue() int {
-	return int(sl.SendMessage(win.TBM_GETRANGEMAX, 0, 0))
+	return int(sl.SendMessage(comctl32.TBM_GETRANGEMAX, 0, 0))
 }
 
 func (sl *Slider) SetRange(min, max int) {
-	sl.SendMessage(win.TBM_SETRANGEMIN, 0, uintptr(min))
-	sl.SendMessage(win.TBM_SETRANGEMAX, 1, uintptr(max))
+	sl.SendMessage(comctl32.TBM_SETRANGEMIN, 0, uintptr(min))
+	sl.SendMessage(comctl32.TBM_SETRANGEMAX, 1, uintptr(max))
 }
 
 func (sl *Slider) Value() int {
-	return int(sl.SendMessage(win.TBM_GETPOS, 0, 0))
+	return int(sl.SendMessage(comctl32.TBM_GETPOS, 0, 0))
 }
 
 func (sl *Slider) SetValue(value int) {
-	sl.SendMessage(win.TBM_SETPOS, 1, uintptr(value))
+	sl.SendMessage(comctl32.TBM_SETPOS, 1, uintptr(value))
 	sl.valueChangedPublisher.Publish()
 }
 
@@ -130,19 +134,19 @@ func (sl *Slider) RestoreState() error {
 }
 
 func (sl *Slider) LineSize() int {
-	return int(sl.SendMessage(win.TBM_GETLINESIZE, 0, 0))
+	return int(sl.SendMessage(comctl32.TBM_GETLINESIZE, 0, 0))
 }
 
 func (sl *Slider) SetLineSize(lineSize int) {
-	sl.SendMessage(win.TBM_SETLINESIZE, 0, uintptr(lineSize))
+	sl.SendMessage(comctl32.TBM_SETLINESIZE, 0, uintptr(lineSize))
 }
 
 func (sl *Slider) PageSize() int {
-	return int(sl.SendMessage(win.TBM_GETPAGESIZE, 0, 0))
+	return int(sl.SendMessage(comctl32.TBM_GETPAGESIZE, 0, 0))
 }
 
 func (sl *Slider) SetPageSize(pageSize int) {
-	sl.SendMessage(win.TBM_SETPAGESIZE, 0, uintptr(pageSize))
+	sl.SendMessage(comctl32.TBM_SETPAGESIZE, 0, uintptr(pageSize))
 }
 
 func (sl *Slider) Tracking() bool {
@@ -153,14 +157,14 @@ func (sl *Slider) SetTracking(tracking bool) {
 	sl.tracking = tracking
 }
 
-func (sl *Slider) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (sl *Slider) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_HSCROLL, win.WM_VSCROLL:
+	case user32.WM_HSCROLL, user32.WM_VSCROLL:
 		switch win.LOWORD(uint32(wParam)) {
-		case win.TB_THUMBPOSITION, win.TB_ENDTRACK:
+		case commctrl.TB_THUMBPOSITION, commctrl.TB_ENDTRACK:
 			sl.valueChangedPublisher.Publish()
 
-		case win.TB_THUMBTRACK:
+		case commctrl.TB_THUMBTRACK:
 			if sl.tracking {
 				sl.valueChangedPublisher.Publish()
 			}

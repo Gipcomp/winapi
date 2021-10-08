@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"bytes"
@@ -15,7 +15,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/user32"
 )
 
 var (
@@ -31,12 +33,12 @@ func init() {
 	AppendToWalkInit(func() {
 		var buf [4]uint16
 
-		win.GetLocaleInfo(win.LOCALE_USER_DEFAULT, win.LOCALE_SDECIMAL, &buf[0], int32(len(buf)))
+		kernel32.GetLocaleInfo(kernel32.LOCALE_USER_DEFAULT, kernel32.LOCALE_SDECIMAL, &buf[0], int32(len(buf)))
 		decimalSepB = byte(buf[0])
 		decimalSepS = syscall.UTF16ToString(buf[0:1])
 		decimalSepUint16 = buf[0]
 
-		win.GetLocaleInfo(win.LOCALE_USER_DEFAULT, win.LOCALE_STHOUSAND, &buf[0], int32(len(buf)))
+		kernel32.GetLocaleInfo(kernel32.LOCALE_USER_DEFAULT, kernel32.LOCALE_STHOUSAND, &buf[0], int32(len(buf)))
 		groupSepB = byte(buf[0])
 		groupSepS = syscall.UTF16ToString(buf[0:1])
 		groupSepUint16 = buf[0]
@@ -505,12 +507,12 @@ func less(a, b interface{}, order SortOrder) bool {
 	return false
 }
 
-func dpiForHDC(hdc win.HDC) int {
-	if hwnd := win.WindowFromDC(hdc); hwnd != 0 {
-		return int(win.GetDpiForWindow(hwnd))
+func dpiForHDC(hdc gdi32.HDC) int {
+	if hwnd := user32.WindowFromDC(hdc); hwnd != 0 {
+		return int(user32.GetDpiForWindow(hwnd))
 	}
 
-	return int(win.GetDeviceCaps(hdc, win.LOGPIXELSX))
+	return int(gdi32.GetDeviceCaps(hdc, gdi32.LOGPIXELSX))
 }
 
 // IntFrom96DPI converts from 1/96" units to native pixels.

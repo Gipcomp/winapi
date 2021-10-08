@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 type stringEventHandlerInfo struct {
 	handler StringEventHandler

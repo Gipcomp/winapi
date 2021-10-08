@@ -4,53 +4,59 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
-)
 
-import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/advapi32"
+	"github.com/Gipcomp/win32/kernel32"
 )
 
 type RegistryKey struct {
-	hKey win.HKEY
+	hKey advapi32.HKEY
 }
 
 func ClassesRootKey() *RegistryKey {
-	return &RegistryKey{win.HKEY_CLASSES_ROOT}
+	return &RegistryKey{advapi32.HKEY_CLASSES_ROOT}
 }
 
 func CurrentUserKey() *RegistryKey {
-	return &RegistryKey{win.HKEY_CURRENT_USER}
+	return &RegistryKey{advapi32.HKEY_CURRENT_USER}
 }
 
 func LocalMachineKey() *RegistryKey {
-	return &RegistryKey{win.HKEY_LOCAL_MACHINE}
+	return &RegistryKey{advapi32.HKEY_LOCAL_MACHINE}
 }
 
 func RegistryKeyString(rootKey *RegistryKey, subKeyPath, valueName string) (value string, err error) {
-	var hKey win.HKEY
-	if win.RegOpenKeyEx(
+	var hKey advapi32.HKEY
+	strPtr, err := syscall.UTF16PtrFromString(subKeyPath)
+	if err != nil {
+		return "", err
+	}
+	if advapi32.RegOpenKeyEx(
 		rootKey.hKey,
-		syscall.StringToUTF16Ptr(subKeyPath),
+		strPtr,
 		0,
-		win.KEY_READ,
-		&hKey) != win.ERROR_SUCCESS {
+		advapi32.KEY_READ,
+		&hKey) != kernel32.ERROR_SUCCESS {
 
 		return "", newError("RegistryKeyString: Failed to open subkey.")
 	}
-	defer win.RegCloseKey(hKey)
+	defer advapi32.RegCloseKey(hKey)
 
 	var typ uint32
 	var data []uint16
 	var bufSize uint32
-
-	if win.ERROR_SUCCESS != win.RegQueryValueEx(
+	strPtr, err = syscall.UTF16PtrFromString(valueName)
+	if err != nil {
+		return "", err
+	}
+	if kernel32.ERROR_SUCCESS != advapi32.RegQueryValueEx(
 		hKey,
-		syscall.StringToUTF16Ptr(valueName),
+		strPtr,
 		nil,
 		&typ,
 		nil,
@@ -61,9 +67,9 @@ func RegistryKeyString(rootKey *RegistryKey, subKeyPath, valueName string) (valu
 
 	data = make([]uint16, bufSize/2+1)
 
-	if win.ERROR_SUCCESS != win.RegQueryValueEx(
+	if kernel32.ERROR_SUCCESS != advapi32.RegQueryValueEx(
 		hKey,
-		syscall.StringToUTF16Ptr(valueName),
+		strPtr,
 		nil,
 		&typ,
 		(*byte)(unsafe.Pointer(&data[0])),
@@ -76,23 +82,30 @@ func RegistryKeyString(rootKey *RegistryKey, subKeyPath, valueName string) (valu
 }
 
 func RegistryKeyUint32(rootKey *RegistryKey, subKeyPath, valueName string) (value uint32, err error) {
-	var hKey win.HKEY
-	if win.RegOpenKeyEx(
+	var hKey advapi32.HKEY
+	strPtr, err := syscall.UTF16PtrFromString(subKeyPath)
+	if err != nil {
+		return 0, err
+	}
+	if advapi32.RegOpenKeyEx(
 		rootKey.hKey,
-		syscall.StringToUTF16Ptr(subKeyPath),
+		strPtr,
 		0,
-		win.KEY_READ,
-		&hKey) != win.ERROR_SUCCESS {
+		advapi32.KEY_READ,
+		&hKey) != kernel32.ERROR_SUCCESS {
 
 		return 0, newError("RegistryKeyUint32: Failed to open subkey.")
 	}
-	defer win.RegCloseKey(hKey)
+	defer advapi32.RegCloseKey(hKey)
 
 	bufSize := uint32(4)
-
-	if win.ERROR_SUCCESS != win.RegQueryValueEx(
+	strPtr, err = syscall.UTF16PtrFromString(valueName)
+	if err != nil {
+		return 0, err
+	}
+	if kernel32.ERROR_SUCCESS != advapi32.RegQueryValueEx(
 		hKey,
-		syscall.StringToUTF16Ptr(valueName),
+		strPtr,
 		nil,
 		nil,
 		(*byte)(unsafe.Pointer(&value)),

@@ -4,21 +4,21 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"strconv"
 	"strings"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
 )
 
 type Image interface {
 	// draw draws image at location (upper left) in native pixels unstreched.
-	draw(hdc win.HDC, location Point) error
+	draw(hdc gdi32.HDC, location Point) error
 
 	// drawStretched draws image streched to given bounds in native pixels.
-	drawStretched(hdc win.HDC, bounds Rectangle) error
+	drawStretched(hdc gdi32.HDC, bounds Rectangle) error
 
 	Dispose()
 
@@ -100,14 +100,14 @@ func NewPaintFuncImagePixelsWithDispose(size Size, paint func(canvas *Canvas, bo
 	return &PaintFuncImage{size96dpi: size, paintPixels: paint, dispose: dispose}
 }
 
-func (pfi *PaintFuncImage) draw(hdc win.HDC, location Point) error {
+func (pfi *PaintFuncImage) draw(hdc gdi32.HDC, location Point) error {
 	dpi := dpiForHDC(hdc)
 	size := SizeFrom96DPI(pfi.size96dpi, dpi)
 
 	return pfi.drawStretched(hdc, Rectangle{location.X, location.Y, size.Width, size.Height})
 }
 
-func (pfi *PaintFuncImage) drawStretched(hdc win.HDC, bounds Rectangle) error {
+func (pfi *PaintFuncImage) drawStretched(hdc gdi32.HDC, bounds Rectangle) error {
 	canvas, err := newCanvasFromHDC(hdc)
 	if err != nil {
 		return err

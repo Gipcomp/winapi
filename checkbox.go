@@ -4,20 +4,22 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"strconv"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 type CheckState int
 
 const (
-	CheckUnchecked     CheckState = win.BST_UNCHECKED
-	CheckChecked       CheckState = win.BST_CHECKED
-	CheckIndeterminate CheckState = win.BST_INDETERMINATE
+	CheckUnchecked     CheckState = user32.BST_UNCHECKED
+	CheckChecked       CheckState = user32.BST_CHECKED
+	CheckIndeterminate CheckState = user32.BST_INDETERMINATE
 )
 
 var checkBoxCheckSize Size // in native pixels
@@ -34,7 +36,7 @@ func NewCheckBox(parent Container) (*CheckBox, error) {
 		cb,
 		parent,
 		"BUTTON",
-		win.WS_TABSTOP|win.WS_VISIBLE|win.BS_AUTOCHECKBOX,
+		user32.WS_TABSTOP|user32.WS_VISIBLE|user32.BS_AUTOCHECKBOX,
 		0); err != nil {
 		return nil, err
 	}
@@ -61,11 +63,11 @@ func NewCheckBox(parent Container) (*CheckBox, error) {
 }
 
 func (cb *CheckBox) TextOnLeftSide() bool {
-	return cb.hasStyleBits(win.BS_LEFTTEXT)
+	return cb.hasStyleBits(user32.BS_LEFTTEXT)
 }
 
 func (cb *CheckBox) SetTextOnLeftSide(textLeft bool) error {
-	return cb.ensureStyleBits(win.BS_LEFTTEXT, textLeft)
+	return cb.ensureStyleBits(user32.BS_LEFTTEXT, textLeft)
 }
 
 func (cb *CheckBox) setChecked(checked bool) {
@@ -75,22 +77,22 @@ func (cb *CheckBox) setChecked(checked bool) {
 }
 
 func (cb *CheckBox) Tristate() bool {
-	return cb.hasStyleBits(win.BS_AUTO3STATE)
+	return cb.hasStyleBits(user32.BS_AUTO3STATE)
 }
 
 func (cb *CheckBox) SetTristate(tristate bool) error {
 	var set, clear uint32
 	if tristate {
-		set, clear = win.BS_AUTO3STATE, win.BS_AUTOCHECKBOX
+		set, clear = user32.BS_AUTO3STATE, user32.BS_AUTOCHECKBOX
 	} else {
-		set, clear = win.BS_AUTOCHECKBOX, win.BS_AUTO3STATE
+		set, clear = user32.BS_AUTOCHECKBOX, user32.BS_AUTO3STATE
 	}
 
 	return cb.setAndClearStyleBits(set, clear)
 }
 
 func (cb *CheckBox) CheckState() CheckState {
-	return CheckState(cb.SendMessage(win.BM_GETCHECK, 0, 0))
+	return CheckState(cb.SendMessage(user32.BM_GETCHECK, 0, 0))
 }
 
 func (cb *CheckBox) SetCheckState(state CheckState) {
@@ -98,7 +100,7 @@ func (cb *CheckBox) SetCheckState(state CheckState) {
 		return
 	}
 
-	cb.SendMessage(win.BM_SETCHECK, uintptr(state), 0)
+	cb.SendMessage(user32.BM_SETCHECK, uintptr(state), 0)
 
 	cb.checkedChangedPublisher.Publish()
 	cb.checkStateChangedPublisher.Publish()
@@ -128,11 +130,11 @@ func (cb *CheckBox) RestoreState() error {
 	return nil
 }
 
-func (cb *CheckBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (cb *CheckBox) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_COMMAND:
+	case user32.WM_COMMAND:
 		switch win.HIWORD(uint32(wParam)) {
-		case win.BN_CLICKED:
+		case user32.BN_CLICKED:
 			cb.checkedChangedPublisher.Publish()
 			cb.checkStateChangedPublisher.Publish()
 		}

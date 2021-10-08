@@ -4,16 +4,16 @@
 
 // +build windows
 
-package walk
+package winapi
 
-import "github.com/lxn/win"
+import "github.com/Gipcomp/win32/user32"
 
 type EllipsisMode int
 
 const (
 	EllipsisNone EllipsisMode = 0
-	EllipsisEnd               = EllipsisMode(win.SS_ENDELLIPSIS)
-	EllipsisPath              = EllipsisMode(win.SS_PATHELLIPSIS)
+	EllipsisEnd               = EllipsisMode(user32.SS_ENDELLIPSIS)
+	EllipsisPath              = EllipsisMode(user32.SS_PATHELLIPSIS)
 )
 
 type Label struct {
@@ -51,7 +51,7 @@ func (l *Label) asStatic() *static {
 }
 
 func (l *Label) EllipsisMode() EllipsisMode {
-	return EllipsisMode(win.GetWindowLong(l.hwndStatic, win.GWL_STYLE) & (win.SS_ENDELLIPSIS | win.SS_PATHELLIPSIS))
+	return EllipsisMode(user32.GetWindowLong(l.hwndStatic, user32.GWL_STYLE) & (user32.SS_ENDELLIPSIS | user32.SS_PATHELLIPSIS))
 }
 
 func (l *Label) SetEllipsisMode(mode EllipsisMode) error {
@@ -61,7 +61,7 @@ func (l *Label) SetEllipsisMode(mode EllipsisMode) error {
 		return nil
 	}
 
-	if err := setAndClearWindowLongBits(l.hwndStatic, win.GWL_STYLE, uint32(mode), uint32(oldMode)); err != nil {
+	if err := setAndClearWindowLongBits(l.hwndStatic, user32.GWL_STYLE, uint32(mode), uint32(oldMode)); err != nil {
 		return err
 	}
 

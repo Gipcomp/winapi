@@ -4,11 +4,9 @@
 
 // +build windows
 
-package walk
+package winapi
 
-import (
-	"github.com/lxn/win"
-)
+import "github.com/Gipcomp/win32/gdi32"
 
 // Rectangle defines upper left corner with width and height region in 1/96" units, or native
 // pixels, or grid rows and columns.
@@ -20,7 +18,7 @@ func (r Rectangle) IsZero() bool {
 	return r.X == 0 && r.Y == 0 && r.Width == 0 && r.Height == 0
 }
 
-func rectangleFromRECT(r win.RECT) Rectangle {
+func rectangleFromRECT(r gdi32.RECT) Rectangle {
 	return Rectangle{
 		X:      int(r.Left),
 		Y:      int(r.Top),
@@ -67,11 +65,11 @@ func (r *Rectangle) SetSize(s Size) Rectangle {
 	return *r
 }
 
-func (r Rectangle) toRECT() win.RECT {
-	return win.RECT{
-		int32(r.X),
-		int32(r.Y),
-		int32(r.X + r.Width),
-		int32(r.Y + r.Height),
+func (r Rectangle) toRECT() gdi32.RECT {
+	return gdi32.RECT{
+		Left:   int32(r.X),
+		Top:    int32(r.Y),
+		Right:  int32(r.X + r.Width),
+		Bottom: int32(r.Y + r.Height),
 	}
 }

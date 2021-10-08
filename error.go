@@ -4,16 +4,15 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"fmt"
 	"log"
 	"runtime/debug"
-)
 
-import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/win"
 )
 
 var (
@@ -90,7 +89,7 @@ func newErrorNoPanic(message string) error {
 }
 
 func lastError(win32FuncName string) error {
-	if errno := win.GetLastError(); errno != win.ERROR_SUCCESS {
+	if errno := kernel32.GetLastError(); errno != kernel32.ERROR_SUCCESS {
 		return newError(fmt.Sprintf("%s: Error %d", win32FuncName, errno))
 	}
 

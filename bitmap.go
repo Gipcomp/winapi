@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"fmt"
@@ -14,14 +14,18 @@ import (
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/gdiplus"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 const inchesPerMeter float64 = 39.37007874
 
 type Bitmap struct {
-	hBmp               win.HBITMAP
-	hPackedDIB         win.HGLOBAL
+	hBmp               gdi32.HBITMAP
+	hPackedDIB         kernel32.HGLOBAL
 	size               Size // in native pixels
 	dpi                int
 	transparencyStatus transparencyStatus
@@ -76,13 +80,13 @@ func NewBitmapWithTransparentPixelsForDPI(size Size, dpi int) (*Bitmap, error) {
 
 // newBitmap creates a bitmap with given size in native pixels and DPI.
 func newBitmap(size Size, transparent bool, dpi int) (bmp *Bitmap, err error) {
-	err = withCompatibleDC(func(hdc win.HDC) error {
+	err = withCompatibleDC(func(hdc gdi32.HDC) error {
 		bufSize := int(size.Width * size.Height * 4)
 
-		var hdr win.BITMAPINFOHEADER
+		var hdr gdi32.BITMAPINFOHEADER
 		hdr.BiSize = uint32(unsafe.Sizeof(hdr))
 		hdr.BiBitCount = 32
-		hdr.BiCompression = win.BI_RGB
+		hdr.BiCompression = gdi32.BI_RGB
 		hdr.BiPlanes = 1
 		hdr.BiWidth = int32(size.Width)
 		hdr.BiHeight = int32(size.Height)
@@ -93,14 +97,14 @@ func newBitmap(size Size, transparent bool, dpi int) (bmp *Bitmap, err error) {
 
 		var bitsPtr unsafe.Pointer
 
-		hBmp := win.CreateDIBSection(hdc, &hdr, win.DIB_RGB_COLORS, &bitsPtr, 0, 0)
+		hBmp := gdi32.CreateDIBSection(hdc, &hdr, gdi32.DIB_RGB_COLORS, &bitsPtr, 0, 0)
 		switch hBmp {
-		case 0, win.ERROR_INVALID_PARAMETER:
+		case 0, kernel32.ERROR_INVALID_PARAMETER:
 			return newError("CreateDIBSection failed")
 		}
 
 		if transparent {
-			win.GdiFlush()
+			gdi32.GdiFlush()
 
 			bits := (*[1 << 24]byte)(bitsPtr)
 
@@ -126,21 +130,25 @@ func NewBitmapFromFile(filePath string) (*Bitmap, error) {
 
 // NewBitmapFromFileForDPI creates new bitmap from a bitmap file at given DPI.
 func NewBitmapFromFileForDPI(filePath string, dpi int) (*Bitmap, error) {
-	var si win.GdiplusStartupInput
+	var si gdiplus.GdiplusStartupInput
 	si.GdiplusVersion = 1
-	if status := win.GdiplusStartup(&si, nil); status != win.Ok {
+	if status := gdiplus.GdiplusStartup(&si, nil); status != gdiplus.Ok {
 		return nil, newError(fmt.Sprintf("GdiplusStartup failed with status '%s'", status))
 	}
-	defer win.GdiplusShutdown()
+	defer gdiplus.GdiplusShutdown()
 
-	var gpBmp *win.GpBitmap
-	if status := win.GdipCreateBitmapFromFile(syscall.StringToUTF16Ptr(filePath), &gpBmp); status != win.Ok {
+	var gpBmp *gdiplus.GpBitmap
+	fiLePathPtr, err := syscall.UTF16PtrFromString(filePath)
+	if err != nil {
+		newError(err.Error())
+	}
+	if status := gdiplus.GdipCreateBitmapFromFile(fiLePathPtr, &gpBmp); status != gdiplus.Ok {
 		return nil, newError(fmt.Sprintf("GdipCreateBitmapFromFile failed with status '%s' for file '%s'", status, filePath))
 	}
-	defer win.GdipDisposeImage((*win.GpImage)(gpBmp))
+	defer gdiplus.GdipDisposeImage((*gdiplus.GpImage)(gpBmp))
 
-	var hBmp win.HBITMAP
-	if status := win.GdipCreateHBITMAPFromBitmap(gpBmp, &hBmp, 0); status != win.Ok {
+	var hBmp gdi32.HBITMAP
+	if status := gdiplus.GdipCreateHBITMAPFromBitmap(gpBmp, &hBmp, 0); status != gdiplus.Ok {
 		return nil, newError(fmt.Sprintf("GdipCreateHBITMAPFromBitmap failed with status '%s' for file '%s'", status, filePath))
 	}
 
@@ -168,12 +176,20 @@ func NewBitmapFromImageForDPI(im image.Image, dpi int) (*Bitmap, error) {
 //
 // Deprecated: Newer applications should use NewBitmapFromResourceForDPI.
 func NewBitmapFromResource(name string) (*Bitmap, error) {
-	return newBitmapFromResource(syscall.StringToUTF16Ptr(name), 96)
+	strPtr, err := syscall.UTF16PtrFromString(name)
+	if err != nil {
+		newError(err.Error())
+	}
+	return newBitmapFromResource(strPtr, 96)
 }
 
 // NewBitmapFromResourceForDPI creates a Bitmap at given DPI from resource by name.
 func NewBitmapFromResourceForDPI(name string, dpi int) (*Bitmap, error) {
-	return newBitmapFromResource(syscall.StringToUTF16Ptr(name), dpi)
+	strPtr, err := syscall.UTF16PtrFromString(name)
+	if err != nil {
+		newError(err.Error())
+	}
+	return newBitmapFromResource(strPtr, dpi)
 }
 
 // NewBitmapFromResourceId creates a Bitmap at 96dpi from resource by ID.
@@ -189,16 +205,16 @@ func NewBitmapFromResourceIdForDPI(id int, dpi int) (*Bitmap, error) {
 }
 
 func newBitmapFromResource(res *uint16, dpi int) (bm *Bitmap, err error) {
-	hInst := win.GetModuleHandle(nil)
+	hInst := kernel32.GetModuleHandle(nil)
 	if hInst == 0 {
 		err = lastError("GetModuleHandle")
 		return
 	}
 
-	if hBmp := win.LoadImage(hInst, res, win.IMAGE_BITMAP, 0, 0, win.LR_CREATEDIBSECTION); hBmp == 0 {
+	if hBmp := user32.LoadImage(hInst, res, user32.IMAGE_BITMAP, 0, 0, user32.LR_CREATEDIBSECTION); hBmp == 0 {
 		err = lastError("LoadImage")
 	} else {
-		bm, err = newBitmapFromHBITMAP(win.HBITMAP(hBmp), dpi)
+		bm, err = newBitmapFromHBITMAP(gdi32.HBITMAP(hBmp), dpi)
 	}
 
 	return
@@ -262,16 +278,16 @@ func NewBitmapFromIconForDPI(icon *Icon, size Size, dpi int) (*Bitmap, error) {
 }
 
 func (bmp *Bitmap) ToImage() (*image.RGBA, error) {
-	var bi win.BITMAPINFO
+	var bi gdi32.BITMAPINFO
 	bi.BmiHeader.BiSize = uint32(unsafe.Sizeof(bi.BmiHeader))
-	hdc := win.GetDC(0)
-	if ret := win.GetDIBits(hdc, bmp.hBmp, 0, 0, nil, &bi, win.DIB_RGB_COLORS); ret == 0 {
+	hdc := user32.GetDC(0)
+	if ret := gdi32.GetDIBits(hdc, bmp.hBmp, 0, 0, nil, &bi, gdi32.DIB_RGB_COLORS); ret == 0 {
 		return nil, newError("GetDIBits get bitmapinfo failed")
 	}
 
 	buf := make([]byte, bi.BmiHeader.BiSizeImage)
-	bi.BmiHeader.BiCompression = win.BI_RGB
-	if ret := win.GetDIBits(hdc, bmp.hBmp, 0, uint32(bi.BmiHeader.BiHeight), &buf[0], &bi, win.DIB_RGB_COLORS); ret == 0 {
+	bi.BmiHeader.BiCompression = gdi32.BI_RGB
+	if ret := gdi32.GetDIBits(hdc, bmp.hBmp, 0, uint32(bi.BmiHeader.BiHeight), &buf[0], &bi, gdi32.DIB_RGB_COLORS); ret == 0 {
 		return nil, newError("GetDIBits failed")
 	}
 
@@ -296,7 +312,7 @@ func (bmp *Bitmap) ToImage() (*image.RGBA, error) {
 
 func (bmp *Bitmap) hasTransparency() (bool, error) {
 	if bmp.transparencyStatus == transparencyUnknown {
-		if err := bmp.withPixels(func(bi *win.BITMAPINFO, hdc win.HDC, pixels *[maxPixels]bgraPixel, pixelsLen int) error {
+		if err := bmp.withPixels(func(bi *gdi32.BITMAPINFO, hdc gdi32.HDC, pixels *[maxPixels]bgraPixel, pixelsLen int) error {
 			for i := 0; i < pixelsLen; i++ {
 				if pixels[i].A == 0x00 {
 					bmp.transparencyStatus = transparencyTransparent
@@ -318,7 +334,7 @@ func (bmp *Bitmap) hasTransparency() (bool, error) {
 }
 
 func (bmp *Bitmap) postProcess() error {
-	return bmp.withPixels(func(bi *win.BITMAPINFO, hdc win.HDC, pixels *[maxPixels]bgraPixel, pixelsLen int) error {
+	return bmp.withPixels(func(bi *gdi32.BITMAPINFO, hdc gdi32.HDC, pixels *[maxPixels]bgraPixel, pixelsLen int) error {
 		for i := 0; i < pixelsLen; i++ {
 			switch pixels[i].A {
 			case 0x00:
@@ -332,7 +348,7 @@ func (bmp *Bitmap) postProcess() error {
 			}
 		}
 
-		if 0 == win.SetDIBits(hdc, bmp.hBmp, 0, uint32(bi.BmiHeader.BiHeight), &pixels[0].B, bi, win.DIB_RGB_COLORS) {
+		if gdi32.SetDIBits(hdc, bmp.hBmp, 0, uint32(bi.BmiHeader.BiHeight), &pixels[0].B, bi, gdi32.DIB_RGB_COLORS) == 0 {
 			return newError("SetDIBits")
 		}
 
@@ -349,41 +365,41 @@ type bgraPixel struct {
 
 const maxPixels = 2 << 27
 
-func (bmp *Bitmap) withPixels(f func(bi *win.BITMAPINFO, hdc win.HDC, pixels *[maxPixels]bgraPixel, pixelsLen int) error) error {
-	var bi win.BITMAPINFO
+func (bmp *Bitmap) withPixels(f func(bi *gdi32.BITMAPINFO, hdc gdi32.HDC, pixels *[maxPixels]bgraPixel, pixelsLen int) error) error {
+	var bi gdi32.BITMAPINFO
 	bi.BmiHeader.BiSize = uint32(unsafe.Sizeof(bi.BmiHeader))
 
-	hdc := win.GetDC(0)
+	hdc := user32.GetDC(0)
 	if hdc == 0 {
 		return newError("GetDC")
 	}
-	defer win.ReleaseDC(0, hdc)
+	defer user32.ReleaseDC(0, hdc)
 
-	if ret := win.GetDIBits(hdc, bmp.hBmp, 0, 0, nil, &bi, win.DIB_RGB_COLORS); ret == 0 {
+	if ret := gdi32.GetDIBits(hdc, bmp.hBmp, 0, 0, nil, &bi, gdi32.DIB_RGB_COLORS); ret == 0 {
 		return newError("GetDIBits #1")
 	}
 
-	hPixels := win.GlobalAlloc(win.GMEM_FIXED, uintptr(bi.BmiHeader.BiSizeImage))
-	defer win.GlobalFree(hPixels)
+	hPixels := kernel32.GlobalAlloc(kernel32.GMEM_FIXED, uintptr(bi.BmiHeader.BiSizeImage))
+	defer kernel32.GlobalFree(hPixels)
 
 	pixels := (*[maxPixels]bgraPixel)(unsafe.Pointer(uintptr(hPixels)))
 
-	bi.BmiHeader.BiCompression = win.BI_RGB
-	if ret := win.GetDIBits(hdc, bmp.hBmp, 0, uint32(bi.BmiHeader.BiHeight), &pixels[0].B, &bi, win.DIB_RGB_COLORS); ret == 0 {
+	bi.BmiHeader.BiCompression = gdi32.BI_RGB
+	if ret := gdi32.GetDIBits(hdc, bmp.hBmp, 0, uint32(bi.BmiHeader.BiHeight), &pixels[0].B, &bi, gdi32.DIB_RGB_COLORS); ret == 0 {
 		return newError("GetDIBits #2")
 	}
 
-	win.GdiFlush()
+	gdi32.GdiFlush()
 
 	return f(&bi, hdc, pixels, int(bi.BmiHeader.BiSizeImage)/4)
 }
 
 func (bmp *Bitmap) Dispose() {
 	if bmp.hBmp != 0 {
-		win.DeleteObject(win.HGDIOBJ(bmp.hBmp))
+		gdi32.DeleteObject(gdi32.HGDIOBJ(bmp.hBmp))
 
-		win.GlobalUnlock(bmp.hPackedDIB)
-		win.GlobalFree(bmp.hPackedDIB)
+		kernel32.GlobalUnlock(bmp.hPackedDIB)
+		kernel32.GlobalFree(bmp.hPackedDIB)
 
 		bmp.hPackedDIB = 0
 		bmp.hBmp = 0
@@ -395,27 +411,27 @@ func (bmp *Bitmap) Size() Size {
 	return SizeTo96DPI(bmp.size, bmp.dpi)
 }
 
-func (bmp *Bitmap) handle() win.HBITMAP {
+func (bmp *Bitmap) handle() gdi32.HBITMAP {
 	return bmp.hBmp
 }
 
-func (bmp *Bitmap) draw(hdc win.HDC, location Point) error {
+func (bmp *Bitmap) draw(hdc gdi32.HDC, location Point) error {
 	return bmp.drawStretched(hdc, Rectangle{X: location.X, Y: location.Y, Width: bmp.size.Width, Height: bmp.size.Height})
 }
 
-func (bmp *Bitmap) drawStretched(hdc win.HDC, bounds Rectangle) error {
+func (bmp *Bitmap) drawStretched(hdc gdi32.HDC, bounds Rectangle) error {
 	return bmp.alphaBlend(hdc, bounds, 255)
 }
 
 // alphaBlend displays bitmaps that have transparent or semitransparent pixels. bounds is represented in native pixels.
-func (bmp *Bitmap) alphaBlend(hdc win.HDC, bounds Rectangle, opacity byte) error {
+func (bmp *Bitmap) alphaBlend(hdc gdi32.HDC, bounds Rectangle, opacity byte) error {
 	return bmp.alphaBlendPart(hdc, bounds, Rectangle{0, 0, bmp.size.Width, bmp.size.Height}, opacity)
 }
 
 // alphaBlendPart displays bitmaps that have transparent or semitransparent pixels. dst and src are
 // represented in native pixels.
-func (bmp *Bitmap) alphaBlendPart(hdc win.HDC, dst, src Rectangle, opacity byte) error {
-	return bmp.withSelectedIntoMemDC(func(hdcMem win.HDC) error {
+func (bmp *Bitmap) alphaBlendPart(hdc gdi32.HDC, dst, src Rectangle, opacity byte) error {
+	return bmp.withSelectedIntoMemDC(func(hdcMem gdi32.HDC) error {
 		if opacity == 255 && (dst.Width != src.Width || dst.Height != src.Height) {
 			transparent, err := bmp.hasTransparency()
 			if err != nil {
@@ -423,11 +439,11 @@ func (bmp *Bitmap) alphaBlendPart(hdc win.HDC, dst, src Rectangle, opacity byte)
 			}
 
 			if !transparent {
-				if 0 == win.SetStretchBltMode(hdc, win.HALFTONE) {
+				if gdi32.SetStretchBltMode(hdc, gdi32.HALFTONE) == 0 {
 					return newError("SetStretchBltMode")
 				}
 
-				if !win.StretchBlt(
+				if !gdi32.StretchBlt(
 					hdc,
 					int32(dst.X),
 					int32(dst.Y),
@@ -438,7 +454,7 @@ func (bmp *Bitmap) alphaBlendPart(hdc win.HDC, dst, src Rectangle, opacity byte)
 					int32(src.Y),
 					int32(src.Width),
 					int32(src.Height),
-					win.SRCCOPY,
+					gdi32.SRCCOPY,
 				) {
 					return newError("StretchBlt failed")
 				}
@@ -447,7 +463,7 @@ func (bmp *Bitmap) alphaBlendPart(hdc win.HDC, dst, src Rectangle, opacity byte)
 			}
 		}
 
-		if !win.AlphaBlend(
+		if !gdi32.AlphaBlend(
 			hdc,
 			int32(dst.X),
 			int32(dst.Y),
@@ -458,7 +474,7 @@ func (bmp *Bitmap) alphaBlendPart(hdc win.HDC, dst, src Rectangle, opacity byte)
 			int32(src.Y),
 			int32(src.Width),
 			int32(src.Height),
-			win.BLENDFUNCTION{AlphaFormat: win.AC_SRC_ALPHA, SourceConstantAlpha: opacity},
+			gdi32.BLENDFUNCTION{AlphaFormat: gdi32.AC_SRC_ALPHA, SourceConstantAlpha: opacity},
 		) {
 			return newError("AlphaBlend failed")
 		}
@@ -467,25 +483,25 @@ func (bmp *Bitmap) alphaBlendPart(hdc win.HDC, dst, src Rectangle, opacity byte)
 	})
 }
 
-func (bmp *Bitmap) withSelectedIntoMemDC(f func(hdcMem win.HDC) error) error {
-	return withCompatibleDC(func(hdcMem win.HDC) error {
-		hBmpOld := win.SelectObject(hdcMem, win.HGDIOBJ(bmp.hBmp))
+func (bmp *Bitmap) withSelectedIntoMemDC(f func(hdcMem gdi32.HDC) error) error {
+	return withCompatibleDC(func(hdcMem gdi32.HDC) error {
+		hBmpOld := gdi32.SelectObject(hdcMem, gdi32.HGDIOBJ(bmp.hBmp))
 		if hBmpOld == 0 {
 			return newError("SelectObject failed")
 		}
-		defer win.SelectObject(hdcMem, hBmpOld)
+		defer gdi32.SelectObject(hdcMem, hBmpOld)
 
 		return f(hdcMem)
 	})
 }
 
-// newBitmapFromHBITMAP creates Bitmap from win.HBITMAP.
+// newBitmapFromHBITMAP creates Bitmap from gdi32.HBITMAP.
 //
-// The BiXPelsPerMeter and BiYPelsPerMeter fields of win.BITMAPINFOHEADER are unreliable (for
+// The BiXPelsPerMeter and BiYPelsPerMeter fields of gdi32.BITMAPINFOHEADER are unreliable (for
 // loaded PNG they are both unset). Therefore, we require caller to specify DPI explicitly.
-func newBitmapFromHBITMAP(hBmp win.HBITMAP, dpi int) (bmp *Bitmap, err error) {
-	var dib win.DIBSECTION
-	if win.GetObject(win.HGDIOBJ(hBmp), unsafe.Sizeof(dib), unsafe.Pointer(&dib)) == 0 {
+func newBitmapFromHBITMAP(hBmp gdi32.HBITMAP, dpi int) (bmp *Bitmap, err error) {
+	var dib gdi32.DIBSECTION
+	if gdi32.GetObject(gdi32.HGDIOBJ(hBmp), unsafe.Sizeof(dib), unsafe.Pointer(&dib)) == 0 {
 		return nil, newError("GetObject failed")
 	}
 
@@ -496,18 +512,18 @@ func newBitmapFromHBITMAP(hBmp win.HBITMAP, dpi int) (bmp *Bitmap, err error) {
 
 	totalSize := uintptr(bmihSize + pixelsSize)
 
-	hPackedDIB := win.GlobalAlloc(win.GHND, totalSize)
-	dest := win.GlobalLock(hPackedDIB)
-	defer win.GlobalUnlock(hPackedDIB)
+	hPackedDIB := kernel32.GlobalAlloc(kernel32.GHND, totalSize)
+	dest := kernel32.GlobalLock(hPackedDIB)
+	defer kernel32.GlobalUnlock(hPackedDIB)
 
 	src := unsafe.Pointer(&dib.DsBmih)
 
-	win.MoveMemory(dest, src, bmihSize)
+	kernel32.MoveMemory(dest, src, bmihSize)
 
 	dest = unsafe.Pointer(uintptr(dest) + bmihSize)
 	src = dib.DsBm.BmBits
 
-	win.MoveMemory(dest, src, pixelsSize)
+	kernel32.MoveMemory(dest, src, pixelsSize)
 
 	return &Bitmap{
 		hBmp:       hBmp,
@@ -520,14 +536,14 @@ func newBitmapFromHBITMAP(hBmp win.HBITMAP, dpi int) (bmp *Bitmap, err error) {
 	}, nil
 }
 
-func hBitmapFromImage(im image.Image, dpi int) (win.HBITMAP, error) {
-	var bi win.BITMAPV5HEADER
+func hBitmapFromImage(im image.Image, dpi int) (gdi32.HBITMAP, error) {
+	var bi gdi32.BITMAPV5HEADER
 	bi.BiSize = uint32(unsafe.Sizeof(bi))
 	bi.BiWidth = int32(im.Bounds().Dx())
 	bi.BiHeight = -int32(im.Bounds().Dy())
 	bi.BiPlanes = 1
 	bi.BiBitCount = 32
-	bi.BiCompression = win.BI_BITFIELDS
+	bi.BiCompression = gdi32.BI_BITFIELDS
 	dpm := int32(math.Round(float64(dpi) * inchesPerMeter))
 	bi.BiXPelsPerMeter = dpm
 	bi.BiYPelsPerMeter = dpm
@@ -538,15 +554,15 @@ func hBitmapFromImage(im image.Image, dpi int) (win.HBITMAP, error) {
 	bi.BV4BlueMask = 0x000000FF
 	bi.BV4AlphaMask = 0xFF000000
 
-	hdc := win.GetDC(0)
-	defer win.ReleaseDC(0, hdc)
+	hdc := user32.GetDC(0)
+	defer user32.ReleaseDC(0, hdc)
 
 	var lpBits unsafe.Pointer
 
 	// Create the DIB section with an alpha channel.
-	hBitmap := win.CreateDIBSection(hdc, &bi.BITMAPINFOHEADER, win.DIB_RGB_COLORS, &lpBits, 0, 0)
+	hBitmap := gdi32.CreateDIBSection(hdc, &bi.BITMAPINFOHEADER, gdi32.DIB_RGB_COLORS, &lpBits, 0, 0)
 	switch hBitmap {
-	case 0, win.ERROR_INVALID_PARAMETER:
+	case 0, kernel32.ERROR_INVALID_PARAMETER:
 		return 0, newError("CreateDIBSection failed")
 	}
 
@@ -567,51 +583,51 @@ func hBitmapFromImage(im image.Image, dpi int) (win.HBITMAP, error) {
 	return hBitmap, nil
 }
 
-func hBitmapFromWindow(window Window) (win.HBITMAP, error) {
-	hdcMem := win.CreateCompatibleDC(0)
+func hBitmapFromWindow(window Window) (gdi32.HBITMAP, error) {
+	hdcMem := gdi32.CreateCompatibleDC(0)
 	if hdcMem == 0 {
 		return 0, newError("CreateCompatibleDC failed")
 	}
-	defer win.DeleteDC(hdcMem)
+	defer gdi32.DeleteDC(hdcMem)
 
-	var r win.RECT
-	if !win.GetWindowRect(window.Handle(), &r) {
+	var r gdi32.RECT
+	if !user32.GetWindowRect(window.Handle(), &r) {
 		return 0, newError("GetWindowRect failed")
 	}
 
-	hdc := win.GetDC(window.Handle())
+	hdc := user32.GetDC(window.Handle())
 	width, height := r.Right-r.Left, r.Bottom-r.Top
-	hBmp := win.CreateCompatibleBitmap(hdc, width, height)
-	win.ReleaseDC(window.Handle(), hdc)
+	hBmp := gdi32.CreateCompatibleBitmap(hdc, width, height)
+	user32.ReleaseDC(window.Handle(), hdc)
 
-	hOld := win.SelectObject(hdcMem, win.HGDIOBJ(hBmp))
-	flags := win.PRF_CHILDREN | win.PRF_CLIENT | win.PRF_ERASEBKGND | win.PRF_NONCLIENT | win.PRF_OWNED
-	window.SendMessage(win.WM_PRINT, uintptr(hdcMem), uintptr(flags))
+	hOld := gdi32.SelectObject(hdcMem, gdi32.HGDIOBJ(hBmp))
+	flags := gdi32.PRF_CHILDREN | gdi32.PRF_CLIENT | gdi32.PRF_ERASEBKGND | gdi32.PRF_NONCLIENT | gdi32.PRF_OWNED
+	window.SendMessage(user32.WM_PRINT, uintptr(hdcMem), uintptr(flags))
 
-	win.SelectObject(hdcMem, hOld)
+	gdi32.SelectObject(hdcMem, hOld)
 
 	return hBmp, nil
 }
 
-// hBitmapFromIcon creates a new win.HBITMAP with given size in native pixels and DPI, and paints
+// hBitmapFromIcon creates a new gdi32.HBITMAP with given size in native pixels and DPI, and paints
 // the icon on it stretched.
-func hBitmapFromIcon(icon *Icon, size Size, dpi int) (win.HBITMAP, error) {
-	hdc := win.GetDC(0)
-	defer win.ReleaseDC(0, hdc)
+func hBitmapFromIcon(icon *Icon, size Size, dpi int) (gdi32.HBITMAP, error) {
+	hdc := user32.GetDC(0)
+	defer user32.ReleaseDC(0, hdc)
 
-	hdcMem := win.CreateCompatibleDC(hdc)
+	hdcMem := gdi32.CreateCompatibleDC(hdc)
 	if hdcMem == 0 {
 		return 0, newError("CreateCompatibleDC failed")
 	}
-	defer win.DeleteDC(hdcMem)
+	defer gdi32.DeleteDC(hdcMem)
 
-	var bi win.BITMAPV5HEADER
+	var bi gdi32.BITMAPV5HEADER
 	bi.BiSize = uint32(unsafe.Sizeof(bi))
 	bi.BiWidth = int32(size.Width)
 	bi.BiHeight = int32(size.Height)
 	bi.BiPlanes = 1
 	bi.BiBitCount = 32
-	bi.BiCompression = win.BI_RGB
+	bi.BiCompression = gdi32.BI_RGB
 	dpm := int32(math.Round(float64(dpi) * inchesPerMeter))
 	bi.BiXPelsPerMeter = dpm
 	bi.BiYPelsPerMeter = dpm
@@ -622,14 +638,14 @@ func hBitmapFromIcon(icon *Icon, size Size, dpi int) (win.HBITMAP, error) {
 	bi.BV4BlueMask = 0x000000FF
 	bi.BV4AlphaMask = 0xFF000000
 
-	hBmp := win.CreateDIBSection(hdcMem, &bi.BITMAPINFOHEADER, win.DIB_RGB_COLORS, nil, 0, 0)
+	hBmp := gdi32.CreateDIBSection(hdcMem, &bi.BITMAPINFOHEADER, gdi32.DIB_RGB_COLORS, nil, 0, 0)
 	switch hBmp {
-	case 0, win.ERROR_INVALID_PARAMETER:
+	case 0, kernel32.ERROR_INVALID_PARAMETER:
 		return 0, newError("CreateDIBSection failed")
 	}
 
-	hOld := win.SelectObject(hdcMem, win.HGDIOBJ(hBmp))
-	defer win.SelectObject(hdcMem, hOld)
+	hOld := gdi32.SelectObject(hdcMem, gdi32.HGDIOBJ(hBmp))
+	defer gdi32.SelectObject(hdcMem, hOld)
 
 	err := icon.drawStretched(hdcMem, Rectangle{Width: size.Width, Height: size.Height})
 	if err != nil {
@@ -639,12 +655,12 @@ func hBitmapFromIcon(icon *Icon, size Size, dpi int) (win.HBITMAP, error) {
 	return hBmp, nil
 }
 
-func withCompatibleDC(f func(hdc win.HDC) error) error {
-	hdc := win.CreateCompatibleDC(0)
+func withCompatibleDC(f func(hdc gdi32.HDC) error) error {
+	hdc := gdi32.CreateCompatibleDC(0)
 	if hdc == 0 {
 		return newError("CreateCompatibleDC failed")
 	}
-	defer win.DeleteDC(hdc)
+	defer gdi32.DeleteDC(hdc)
 
 	return f(hdc)
 }

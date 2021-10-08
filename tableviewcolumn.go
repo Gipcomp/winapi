@@ -4,13 +4,16 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 // TableViewColumn represents a column in a TableView.
@@ -298,17 +301,17 @@ func (tvc *TableViewColumn) Width() int {
 		return tvc.width
 	}
 
-	// We call win.SendMessage instead of tvc.sendMessage here, because some
+	// We call user32.SendMessage instead of tvc.sendMessage here, because some
 	// call inside the latter interferes with scrolling via scroll bar button
 	// when *TableViewColumn.Width is called from *TableView.StretchLastColumn.
-	var hwnd win.HWND
+	var hwnd handle.HWND
 	if tvc.frozen {
 		hwnd = tvc.tv.hwndFrozenLV
 	} else {
 		hwnd = tvc.tv.hwndNormalLV
 	}
 
-	return tvc.tv.IntTo96DPI(int(win.SendMessage(hwnd, win.LVM_GETCOLUMNWIDTH, uintptr(tvc.indexInListView()), 0)))
+	return tvc.tv.IntTo96DPI(int(user32.SendMessage(hwnd, commctrl.LVM_GETCOLUMNWIDTH, uintptr(tvc.indexInListView()), 0)))
 }
 
 // SetWidth sets the width of the column in pixels.
@@ -378,14 +381,18 @@ func (tvc *TableViewColumn) indexInListView() int32 {
 }
 
 func (tvc *TableViewColumn) create() error {
-	var lvc win.LVCOLUMN
+	var lvc commctrl.LVCOLUMN
 
 	index := tvc.indexInListView()
 
 	dpi := tvc.tv.DPI()
-	lvc.Mask = win.LVCF_FMT | win.LVCF_WIDTH | win.LVCF_TEXT | win.LVCF_SUBITEM
+	lvc.Mask = commctrl.LVCF_FMT | commctrl.LVCF_WIDTH | commctrl.LVCF_TEXT | commctrl.LVCF_SUBITEM
 	lvc.ISubItem = index
-	lvc.PszText = syscall.StringToUTF16Ptr(tvc.TitleEffective())
+	var err error
+	lvc.PszText, err = syscall.UTF16PtrFromString(tvc.TitleEffective())
+	if err != nil {
+		return err
+	}
 	if tvc.width > 0 {
 		lvc.Cx = int32(IntFrom96DPI(tvc.width, dpi))
 	} else {
@@ -400,7 +407,7 @@ func (tvc *TableViewColumn) create() error {
 		lvc.Fmt = 1
 	}
 
-	if -1 == int(tvc.sendMessage(win.LVM_INSERTCOLUMN, uintptr(index), uintptr(unsafe.Pointer(&lvc)))) {
+	if -1 == int(tvc.sendMessage(commctrl.LVM_INSERTCOLUMN, uintptr(index), uintptr(unsafe.Pointer(&lvc)))) {
 		return newError("LVM_INSERTCOLUMN")
 	}
 
@@ -412,7 +419,7 @@ func (tvc *TableViewColumn) create() error {
 func (tvc *TableViewColumn) destroy() error {
 	width := tvc.Width()
 
-	if win.FALSE == tvc.sendMessage(win.LVM_DELETECOLUMN, uintptr(tvc.indexInListView()), 0) {
+	if win.FALSE == tvc.sendMessage(commctrl.LVM_DELETECOLUMN, uintptr(tvc.indexInListView()), 0) {
 		return newError("LVM_DELETECOLUMN")
 	}
 
@@ -430,7 +437,7 @@ func (tvc *TableViewColumn) update() error {
 
 	lvc := tvc.getLVCOLUMN()
 
-	if win.FALSE == tvc.sendMessage(win.LVM_SETCOLUMN, uintptr(tvc.indexInListView()), uintptr(unsafe.Pointer(lvc))) {
+	if win.FALSE == tvc.sendMessage(commctrl.LVM_SETCOLUMN, uintptr(tvc.indexInListView()), uintptr(unsafe.Pointer(lvc))) {
 		return newError("LVM_SETCOLUMN")
 	}
 
@@ -439,8 +446,8 @@ func (tvc *TableViewColumn) update() error {
 	return nil
 }
 
-func (tvc *TableViewColumn) getLVCOLUMN() *win.LVCOLUMN {
-	var lvc win.LVCOLUMN
+func (tvc *TableViewColumn) getLVCOLUMN() *commctrl.LVCOLUMN {
+	var lvc commctrl.LVCOLUMN
 
 	dpi := 96
 	if tvc.tv != nil {
@@ -450,9 +457,13 @@ func (tvc *TableViewColumn) getLVCOLUMN() *win.LVCOLUMN {
 	}
 	width := IntFrom96DPI(tvc.width, dpi)
 
-	lvc.Mask = win.LVCF_FMT | win.LVCF_WIDTH | win.LVCF_TEXT | win.LVCF_SUBITEM
+	lvc.Mask = commctrl.LVCF_FMT | commctrl.LVCF_WIDTH | commctrl.LVCF_TEXT | commctrl.LVCF_SUBITEM
 	lvc.ISubItem = int32(tvc.indexInListView())
-	lvc.PszText = syscall.StringToUTF16Ptr(tvc.TitleEffective())
+	var err error
+	lvc.PszText, err = syscall.UTF16PtrFromString(tvc.TitleEffective())
+	if err != nil {
+		newError(err.Error())
+	}
 	lvc.Cx = int32(width)
 
 	switch tvc.alignment {
@@ -475,12 +486,12 @@ func (tvc *TableViewColumn) sendMessage(msg uint32, wp, lp uintptr) uintptr {
 	tvc.tv.SetCheckBoxes(tvc.tv.CheckBoxes())
 	tvc.tv.applyImageList()
 
-	var hwnd win.HWND
+	var hwnd handle.HWND
 	if tvc.frozen {
 		hwnd = tvc.tv.hwndFrozenLV
 	} else {
 		hwnd = tvc.tv.hwndNormalLV
 	}
 
-	return win.SendMessage(hwnd, msg, wp, lp)
+	return user32.SendMessage(hwnd, msg, wp, lp)
 }

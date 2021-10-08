@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"fmt"
@@ -14,7 +14,13 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/uxtheme"
+	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/win32/winuser"
 )
 
 type ListBox struct {
@@ -59,7 +65,7 @@ func NewListBoxWithStyle(parent Container, style uint32) (*ListBox, error) {
 		lb,
 		parent,
 		"LISTBOX",
-		win.WS_BORDER|win.WS_TABSTOP|win.WS_VISIBLE|win.WS_VSCROLL|win.WS_HSCROLL|win.LBS_NOINTEGRALHEIGHT|win.LBS_NOTIFY|style,
+		user32.WS_BORDER|user32.WS_TABSTOP|user32.WS_VISIBLE|user32.WS_VSCROLL|user32.WS_HSCROLL|winuser.LBS_NOINTEGRALHEIGHT|winuser.LBS_NOTIFY|style,
 		0)
 	if err != nil {
 		return nil, err
@@ -161,17 +167,17 @@ func (lb *ListBox) SetItemStyler(styler ListItemStyler) {
 func (lb *ListBox) ApplySysColors() {
 	lb.WidgetBase.ApplySysColors()
 
-	var hc win.HIGHCONTRAST
+	var hc user32.HIGHCONTRAST
 	hc.CbSize = uint32(unsafe.Sizeof(hc))
-	if win.SystemParametersInfo(win.SPI_GETHIGHCONTRAST, hc.CbSize, unsafe.Pointer(&hc), 0) {
-		lb.style.highContrastActive = hc.DwFlags&win.HCF_HIGHCONTRASTON != 0
+	if user32.SystemParametersInfo(user32.SPI_GETHIGHCONTRAST, hc.CbSize, unsafe.Pointer(&hc), 0) {
+		lb.style.highContrastActive = hc.DwFlags&user32.HCF_HIGHCONTRASTON != 0
 	}
 
-	lb.themeNormalBGColor = Color(win.GetSysColor(win.COLOR_WINDOW))
-	lb.themeNormalTextColor = Color(win.GetSysColor(win.COLOR_WINDOWTEXT))
-	lb.themeSelectedBGColor = Color(win.GetSysColor(win.COLOR_HIGHLIGHT))
-	lb.themeSelectedTextColor = Color(win.GetSysColor(win.COLOR_HIGHLIGHTTEXT))
-	lb.themeSelectedNotFocusedBGColor = Color(win.GetSysColor(win.COLOR_BTNFACE))
+	lb.themeNormalBGColor = Color(user32.GetSysColor(user32.COLOR_WINDOW))
+	lb.themeNormalTextColor = Color(user32.GetSysColor(user32.COLOR_WINDOWTEXT))
+	lb.themeSelectedBGColor = Color(user32.GetSysColor(user32.COLOR_HIGHLIGHT))
+	lb.themeSelectedTextColor = Color(user32.GetSysColor(user32.COLOR_HIGHLIGHTTEXT))
+	lb.themeSelectedNotFocusedBGColor = Color(user32.GetSysColor(user32.COLOR_BTNFACE))
 }
 
 func (lb *ListBox) ApplyDPI(dpi int) {
@@ -207,16 +213,20 @@ func (lb *ListBox) itemString(index int) string {
 //insert one item from list model
 func (lb *ListBox) insertItemAt(index int) error {
 	str := lb.itemString(index)
-	lp := uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(str)))
-	ret := int(lb.SendMessage(win.LB_INSERTSTRING, uintptr(index), lp))
-	if ret == win.LB_ERRSPACE || ret == win.LB_ERR {
+	strPtr, err := syscall.UTF16PtrFromString(str)
+	if err != nil {
+		newError(err.Error())
+	}
+	lp := uintptr(unsafe.Pointer(strPtr))
+	ret := int(lb.SendMessage(winuser.LB_INSERTSTRING, uintptr(index), lp))
+	if ret == winuser.LB_ERRSPACE || ret == winuser.LB_ERR {
 		return newError("SendMessage(LB_INSERTSTRING)")
 	}
 	return nil
 }
 
 func (lb *ListBox) removeItem(index int) error {
-	if win.LB_ERR == int(lb.SendMessage(win.LB_DELETESTRING, uintptr(index), 0)) {
+	if winuser.LB_ERR == int(lb.SendMessage(winuser.LB_DELETESTRING, uintptr(index), 0)) {
 		return newError("SendMessage(LB_DELETESTRING)")
 	}
 
@@ -228,7 +238,7 @@ func (lb *ListBox) resetItems() error {
 	lb.SetSuspended(true)
 	defer lb.SetSuspended(false)
 
-	lb.SendMessage(win.LB_RESETCONTENT, 0, 0)
+	lb.SendMessage(winuser.LB_RESETCONTENT, 0, 0)
 
 	lb.maxItemTextWidth = 0
 
@@ -258,7 +268,7 @@ func (lb *ListBox) resetItems() error {
 	if lb.styler == nil {
 		// Update the listbox width (this sets the correct horizontal scrollbar).
 		sh := lb.idealSize()
-		lb.SendMessage(win.LB_SETHORIZONTALEXTENT, uintptr(sh.Width), 0)
+		lb.SendMessage(winuser.LB_SETHORIZONTALEXTENT, uintptr(sh.Width), 0)
 	}
 
 	return nil
@@ -274,11 +284,11 @@ func (lb *ListBox) ensureVisibleItemsHeightUpToDate() error {
 		defer lb.SetSuspended(false)
 	}
 
-	topIndex := int(lb.SendMessage(win.LB_GETTOPINDEX, 0, 0))
+	topIndex := int(lb.SendMessage(winuser.LB_GETTOPINDEX, 0, 0))
 	offset := maxi(0, topIndex-10)
 	count := lb.model.ItemCount()
-	var rc win.RECT
-	lb.SendMessage(win.LB_GETITEMRECT, uintptr(offset), uintptr(unsafe.Pointer(&rc)))
+	var rc gdi32.RECT
+	lb.SendMessage(winuser.LB_GETITEMRECT, uintptr(offset), uintptr(unsafe.Pointer(&rc)))
 	width := int(rc.Right - rc.Left)
 	offsetTop := int(rc.Top)
 	lbHeight := lb.HeightPixels()
@@ -289,7 +299,7 @@ func (lb *ListBox) ensureVisibleItemsHeightUpToDate() error {
 			continue
 		}
 
-		lb.SendMessage(win.LB_GETITEMRECT, uintptr(i), uintptr(unsafe.Pointer(&rc)))
+		lb.SendMessage(winuser.LB_GETITEMRECT, uintptr(i), uintptr(unsafe.Pointer(&rc)))
 
 		if int(rc.Top)-offsetTop > lbHeight {
 			if pastBottomCount++; pastBottomCount > 10 {
@@ -299,7 +309,7 @@ func (lb *ListBox) ensureVisibleItemsHeightUpToDate() error {
 
 		height := lb.styler.ItemHeight(i, width)
 
-		lb.SendMessage(win.LB_SETITEMHEIGHT, uintptr(i), uintptr(height))
+		lb.SendMessage(winuser.LB_SETITEMHEIGHT, uintptr(i), uintptr(height))
 
 		lb.lastWidthsMeasuredFor[i] = lb.lastWidth
 	}
@@ -316,19 +326,19 @@ func (lb *ListBox) attachModel() {
 	lb.itemsResetHandlerHandle = lb.model.ItemsReset().Attach(itemsResetHandler)
 
 	itemChangedHandler := func(index int) {
-		if win.CB_ERR == lb.SendMessage(win.LB_DELETESTRING, uintptr(index), 0) {
+		if commctrl.CB_ERR == lb.SendMessage(winuser.LB_DELETESTRING, uintptr(index), 0) {
 			newError("SendMessage(CB_DELETESTRING)")
 		}
 
 		lb.insertItemAt(index)
 
 		if lb.styler != nil {
-			var rc win.RECT
-			lb.SendMessage(win.LB_GETITEMRECT, uintptr(index), uintptr(unsafe.Pointer(&rc)))
+			var rc gdi32.RECT
+			lb.SendMessage(winuser.LB_GETITEMRECT, uintptr(index), uintptr(unsafe.Pointer(&rc)))
 			width := int(rc.Right - rc.Left)
 			height := lb.styler.ItemHeight(index, width)
 
-			lb.SendMessage(win.LB_SETITEMHEIGHT, uintptr(index), uintptr(height))
+			lb.SendMessage(winuser.LB_SETITEMHEIGHT, uintptr(index), uintptr(height))
 
 			lb.lastWidthsMeasuredFor[index] = lb.lastWidth
 		}
@@ -519,15 +529,15 @@ func (lb *ListBox) SetPrecision(value int) {
 
 // calculateMaxItemTextWidth returns maximum item text width in native pixels.
 func (lb *ListBox) calculateMaxItemTextWidth() int {
-	hdc := win.GetDC(lb.hWnd)
+	hdc := user32.GetDC(lb.hWnd)
 	if hdc == 0 {
 		newError("GetDC failed")
 		return -1
 	}
-	defer win.ReleaseDC(lb.hWnd, hdc)
+	defer user32.ReleaseDC(lb.hWnd, hdc)
 
-	hFontOld := win.SelectObject(hdc, win.HGDIOBJ(lb.Font().handleForDPI(lb.DPI())))
-	defer win.SelectObject(hdc, hFontOld)
+	hFontOld := gdi32.SelectObject(hdc, gdi32.HGDIOBJ(lb.Font().handleForDPI(lb.DPI())))
+	defer gdi32.SelectObject(hdc, hFontOld)
 
 	var maxWidth int
 
@@ -537,10 +547,13 @@ func (lb *ListBox) calculateMaxItemTextWidth() int {
 	count := lb.model.ItemCount()
 	for i := 0; i < count; i++ {
 		item := lb.itemString(i)
-		var s win.SIZE
-		str := syscall.StringToUTF16(item)
+		var s gdi32.SIZE
+		str, err := syscall.UTF16FromString(item)
+		if err != nil {
+			newError(err.Error())
+		}
 
-		if !win.GetTextExtentPoint32(hdc, &str[0], int32(len(str)-1), &s) {
+		if !gdi32.GetTextExtentPoint32(hdc, &str[0], int32(len(str)-1), &s) {
 			newError("GetTextExtentPoint32 failed")
 			return -1
 		}
@@ -567,23 +580,23 @@ func (lb *ListBox) idealSize() Size {
 }
 
 func (lb *ListBox) ItemVisible(index int) bool {
-	topIndex := int(lb.SendMessage(win.LB_GETTOPINDEX, 0, 0))
-	var rc win.RECT
-	lb.SendMessage(win.LB_GETITEMRECT, uintptr(index), uintptr(unsafe.Pointer(&rc)))
+	topIndex := int(lb.SendMessage(winuser.LB_GETTOPINDEX, 0, 0))
+	var rc gdi32.RECT
+	lb.SendMessage(winuser.LB_GETITEMRECT, uintptr(index), uintptr(unsafe.Pointer(&rc)))
 
 	return index >= topIndex && int(rc.Top) < lb.HeightPixels()
 }
 
 func (lb *ListBox) EnsureItemVisible(index int) {
-	lb.SendMessage(win.LB_SETTOPINDEX, uintptr(index), 0)
+	lb.SendMessage(winuser.LB_SETTOPINDEX, uintptr(index), 0)
 }
 
 func (lb *ListBox) CurrentIndex() int {
-	return int(int32(lb.SendMessage(win.LB_GETCURSEL, 0, 0)))
+	return int(int32(lb.SendMessage(winuser.LB_GETCURSEL, 0, 0)))
 }
 
 func (lb *ListBox) SetCurrentIndex(value int) error {
-	if value > -1 && win.LB_ERR == int(int32(lb.SendMessage(win.LB_SETCURSEL, uintptr(value), 0))) {
+	if value > -1 && winuser.LB_ERR == int(int32(lb.SendMessage(winuser.LB_SETCURSEL, uintptr(value), 0))) {
 		return newError("Invalid index or ensure lb is single-selection listbox")
 	}
 
@@ -602,12 +615,12 @@ func (lb *ListBox) SetCurrentIndex(value int) error {
 }
 
 func (lb *ListBox) SelectedIndexes() []int {
-	count := int(int32(lb.SendMessage(win.LB_GETCOUNT, 0, 0)))
+	count := int(int32(lb.SendMessage(winuser.LB_GETCOUNT, 0, 0)))
 	if count < 1 {
 		return nil
 	}
 	index32 := make([]int32, count)
-	if n := int(int32(lb.SendMessage(win.LB_GETSELITEMS, uintptr(count), uintptr(unsafe.Pointer(&index32[0]))))); n == win.LB_ERR {
+	if n := int(int32(lb.SendMessage(winuser.LB_GETSELITEMS, uintptr(count), uintptr(unsafe.Pointer(&index32[0]))))); n == winuser.LB_ERR {
 		return nil
 	} else {
 		indexes := make([]int, n)
@@ -620,9 +633,9 @@ func (lb *ListBox) SelectedIndexes() []int {
 
 func (lb *ListBox) SetSelectedIndexes(indexes []int) {
 	var m int32 = -1
-	lb.SendMessage(win.LB_SETSEL, win.FALSE, uintptr(m))
+	lb.SendMessage(winuser.LB_SETSEL, win.FALSE, uintptr(m))
 	for _, v := range indexes {
-		lb.SendMessage(win.LB_SETSEL, win.TRUE, uintptr(uint32(v)))
+		lb.SendMessage(winuser.LB_SETSEL, win.TRUE, uintptr(uint32(v)))
 	}
 	lb.selectedIndexesChangedPublisher.Publish()
 }
@@ -639,23 +652,23 @@ func (lb *ListBox) ItemActivated() *Event {
 	return lb.itemActivatedPublisher.Event()
 }
 
-func (lb *ListBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (lb *ListBox) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_MEASUREITEM:
+	case user32.WM_MEASUREITEM:
 		if lb.styler == nil {
 			break
 		}
 
-		mis := (*win.MEASUREITEMSTRUCT)(unsafe.Pointer(lParam))
+		mis := (*user32.MEASUREITEMSTRUCT)(unsafe.Pointer(lParam))
 
 		mis.ItemHeight = uint32(lb.styler.DefaultItemHeight())
 
 		return win.TRUE
 
-	case win.WM_DRAWITEM:
-		dis := (*win.DRAWITEMSTRUCT)(unsafe.Pointer(lParam))
+	case user32.WM_DRAWITEM:
+		dis := (*user32.DRAWITEMSTRUCT)(unsafe.Pointer(lParam))
 
-		if lb.styler == nil || dis.ItemID < 0 || dis.ItemAction != win.ODA_DRAWENTIRE {
+		if lb.styler == nil || dis.ItemID < 0 || dis.ItemAction != user32.ODA_DRAWENTIRE {
 			return win.TRUE
 		}
 
@@ -668,19 +681,23 @@ func (lb *ListBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 		lb.style.hdc = dis.HDC
 		lb.style.Font = lb.Font()
 
-		if dis.ItemAction == win.ODA_FOCUS {
+		if dis.ItemAction == user32.ODA_FOCUS {
 			return win.TRUE
 		}
 
-		var hTheme win.HTHEME
+		var hTheme uxtheme.HTHEME
 		if !lb.style.highContrastActive {
-			if hTheme = win.OpenThemeData(lb.hWnd, syscall.StringToUTF16Ptr("Listview")); hTheme != 0 {
-				defer win.CloseThemeData(hTheme)
+			strPtr, err := syscall.UTF16PtrFromString("Listview")
+			if err != nil {
+				newError(err.Error())
+			}
+			if hTheme = uxtheme.OpenThemeData(lb.hWnd, strPtr); hTheme != 0 {
+				defer uxtheme.CloseThemeData(hTheme)
 			}
 		}
 		lb.style.hTheme = hTheme
 
-		if dis.ItemState&win.ODS_CHECKED != 0 {
+		if dis.ItemState&user32.ODS_CHECKED != 0 {
 			if lb.style.highContrastActive || lb.Focused() {
 				lb.style.BackgroundColor = lb.themeSelectedBGColor
 				lb.style.TextColor = lb.themeSelectedTextColor
@@ -721,10 +738,10 @@ func (lb *ListBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 
 		return win.TRUE
 
-	case win.WM_WINDOWPOSCHANGED:
-		wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
+	case user32.WM_WINDOWPOSCHANGED:
+		wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
 
-		if wp.Flags&win.SWP_NOSIZE != 0 {
+		if wp.Flags&user32.SWP_NOSIZE != 0 {
 			break
 		}
 
@@ -738,39 +755,39 @@ func (lb *ListBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 
 		lb.ensureVisibleItemsHeightUpToDate()
 
-		return win.CallWindowProc(lb.origWndProcPtr, hwnd, msg, wParam, lParam)
+		return user32.CallWindowProc(lb.origWndProcPtr, hwnd, msg, wParam, lParam)
 
-	case win.WM_VSCROLL:
+	case user32.WM_VSCROLL:
 		lb.ensureVisibleItemsHeightUpToDate()
 
-	case win.WM_MOUSEWHEEL:
+	case user32.WM_MOUSEWHEEL:
 		lb.ensureVisibleItemsHeightUpToDate()
 
-	case win.WM_LBUTTONDOWN:
+	case user32.WM_LBUTTONDOWN:
 		lb.Invalidate()
 
-	case win.WM_MOUSEMOVE:
+	case user32.WM_MOUSEMOVE:
 		if lb.styler == nil {
 			break
 		}
 
 		if !lb.trackingMouseEvent {
-			var tme win.TRACKMOUSEEVENT
+			var tme user32.TRACKMOUSEEVENT
 			tme.CbSize = uint32(unsafe.Sizeof(tme))
-			tme.DwFlags = win.TME_LEAVE
+			tme.DwFlags = user32.TME_LEAVE
 			tme.HwndTrack = lb.hWnd
 
-			lb.trackingMouseEvent = win.TrackMouseEvent(&tme)
+			lb.trackingMouseEvent = user32.TrackMouseEvent(&tme)
 		}
 
 		oldHoverIndex := lb.style.hoverIndex
 
-		result := uint32(lb.SendMessage(win.LB_ITEMFROMPOINT, 0, lParam))
+		result := uint32(lb.SendMessage(winuser.LB_ITEMFROMPOINT, 0, lParam))
 		if win.HIWORD(result) == 0 {
 			index := int(win.LOWORD(result))
 
-			var rc win.RECT
-			lb.SendMessage(win.LB_GETITEMRECT, uintptr(index), uintptr(unsafe.Pointer(&rc)))
+			var rc gdi32.RECT
+			lb.SendMessage(winuser.LB_GETITEMRECT, uintptr(index), uintptr(unsafe.Pointer(&rc)))
 
 			lp := uint32(lParam)
 			x := int32(win.LOWORD(lp))
@@ -779,12 +796,12 @@ func (lb *ListBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 			if x >= rc.Left && x <= rc.Right && y >= rc.Top && y <= rc.Bottom {
 				lb.style.hoverIndex = index
 
-				win.InvalidateRect(lb.hWnd, &rc, true)
+				user32.InvalidateRect(lb.hWnd, &rc, true)
 			}
 		}
 
 		if lb.style.hoverIndex != oldHoverIndex {
-			if wParam&win.MK_LBUTTON != 0 {
+			if wParam&user32.MK_LBUTTON != 0 {
 				lb.Invalidate()
 			} else {
 				lb.invalidateItem(oldHoverIndex)
@@ -792,7 +809,7 @@ func (lb *ListBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 			}
 		}
 
-	case win.WM_MOUSELEAVE:
+	case user32.WM_MOUSELEAVE:
 		if lb.styler == nil {
 			break
 		}
@@ -805,20 +822,20 @@ func (lb *ListBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 
 		lb.invalidateItem(index)
 
-	case win.WM_COMMAND:
+	case user32.WM_COMMAND:
 		switch win.HIWORD(uint32(wParam)) {
-		case win.LBN_SELCHANGE:
+		case winuser.LBN_SELCHANGE:
 			lb.ensureVisibleItemsHeightUpToDate()
 			lb.prevCurIndex = lb.CurrentIndex()
 			lb.currentValue = lb.Property("Value").Get()
 			lb.currentIndexChangedPublisher.Publish()
 			lb.selectedIndexesChangedPublisher.Publish()
 
-		case win.LBN_DBLCLK:
+		case winuser.LBN_DBLCLK:
 			lb.itemActivatedPublisher.Publish()
 		}
 
-	case win.WM_GETDLGCODE:
+	case user32.WM_GETDLGCODE:
 		if form := ancestor(lb); form != nil {
 			if dlg, ok := form.(dialogish); ok {
 				if dlg.DefaultButton() != nil {
@@ -829,11 +846,11 @@ func (lb *ListBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 			}
 		}
 
-		if wParam == win.VK_RETURN {
-			return win.DLGC_WANTALLKEYS
+		if wParam == user32.VK_RETURN {
+			return user32.DLGC_WANTALLKEYS
 		}
 
-	case win.WM_KEYDOWN:
+	case user32.WM_KEYDOWN:
 		if uint32(lParam)>>30 == 0 && Key(wParam) == KeyReturn && lb.CurrentIndex() > -1 {
 			lb.itemActivatedPublisher.Publish()
 		}
@@ -843,10 +860,10 @@ func (lb *ListBox) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 }
 
 func (lb *ListBox) invalidateItem(index int) {
-	var rc win.RECT
-	lb.SendMessage(win.LB_GETITEMRECT, uintptr(index), uintptr(unsafe.Pointer(&rc)))
+	var rc gdi32.RECT
+	lb.SendMessage(winuser.LB_GETITEMRECT, uintptr(index), uintptr(unsafe.Pointer(&rc)))
 
-	win.InvalidateRect(lb.hWnd, &rc, true)
+	user32.InvalidateRect(lb.hWnd, &rc, true)
 }
 
 func (lb *ListBox) CreateLayoutItem(ctx *LayoutContext) LayoutItem {

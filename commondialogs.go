@@ -4,17 +4,21 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"fmt"
 	"path/filepath"
 	"syscall"
 	"unsafe"
-)
 
-import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/comdlg32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/ole32"
+	"github.com/Gipcomp/win32/shell32"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 type FileDialog struct {
@@ -28,8 +32,8 @@ type FileDialog struct {
 	ShowReadOnlyCB bool
 }
 
-func (dlg *FileDialog) show(owner Form, fun func(ofn *win.OPENFILENAME) bool, flags uint32) (accepted bool, err error) {
-	ofn := new(win.OPENFILENAME)
+func (dlg *FileDialog) show(owner Form, fun func(ofn *comdlg32.OPENFILENAME) bool, flags uint32) (accepted bool, err error) {
+	ofn := new(comdlg32.OPENFILENAME)
 
 	ofn.LStructSize = uint32(unsafe.Sizeof(*ofn))
 	if owner != nil {
@@ -37,7 +41,11 @@ func (dlg *FileDialog) show(owner Form, fun func(ofn *win.OPENFILENAME) bool, fl
 	}
 
 	filter := make([]uint16, len(dlg.Filter)+2)
-	copy(filter, syscall.StringToUTF16(dlg.Filter))
+	strUtf, err := syscall.UTF16FromString(dlg.Filter)
+	if err != nil {
+		newError(err.Error())
+	}
+	copy(filter, strUtf)
 	// Replace '|' with the expected '\0'.
 	for i, c := range filter {
 		if byte(c) == '|' {
@@ -47,26 +55,36 @@ func (dlg *FileDialog) show(owner Form, fun func(ofn *win.OPENFILENAME) bool, fl
 	ofn.LpstrFilter = &filter[0]
 	ofn.NFilterIndex = uint32(dlg.FilterIndex)
 
-	ofn.LpstrInitialDir = syscall.StringToUTF16Ptr(dlg.InitialDirPath)
-	ofn.LpstrTitle = syscall.StringToUTF16Ptr(dlg.Title)
-	ofn.Flags = win.OFN_FILEMUSTEXIST | flags | dlg.Flags
+	ofn.LpstrInitialDir, err = syscall.UTF16PtrFromString(dlg.InitialDirPath)
+	if err != nil {
+		newError(err.Error())
+	}
+	ofn.LpstrTitle, err = syscall.UTF16PtrFromString(dlg.Title)
+	if err != nil {
+		newError(err.Error())
+	}
+	ofn.Flags = comdlg32.OFN_FILEMUSTEXIST | flags | dlg.Flags
 
 	if !dlg.ShowReadOnlyCB {
-		ofn.Flags |= win.OFN_HIDEREADONLY
+		ofn.Flags |= comdlg32.OFN_HIDEREADONLY
 	}
 
 	var fileBuf []uint16
-	if flags&win.OFN_ALLOWMULTISELECT > 0 {
+	if flags&comdlg32.OFN_ALLOWMULTISELECT > 0 {
 		fileBuf = make([]uint16, 65536)
 	} else {
 		fileBuf = make([]uint16, 1024)
-		copy(fileBuf, syscall.StringToUTF16(dlg.FilePath))
+		strUtf, err := syscall.UTF16FromString(dlg.FilePath)
+		if err != nil {
+			newError(err.Error())
+		}
+		copy(fileBuf, strUtf)
 	}
 	ofn.LpstrFile = &fileBuf[0]
 	ofn.NMaxFile = uint32(len(fileBuf))
 
 	if !fun(ofn) {
-		errno := win.CommDlgExtendedError()
+		errno := comdlg32.CommDlgExtendedError()
 		if errno != 0 {
 			err = newError(fmt.Sprintf("Error %d", errno))
 		}
@@ -75,7 +93,7 @@ func (dlg *FileDialog) show(owner Form, fun func(ofn *win.OPENFILENAME) bool, fl
 
 	dlg.FilterIndex = int(ofn.NFilterIndex)
 
-	if flags&win.OFN_ALLOWMULTISELECT > 0 {
+	if flags&comdlg32.OFN_ALLOWMULTISELECT > 0 {
 		split := func() [][]uint16 {
 			var parts [][]uint16
 
@@ -116,20 +134,20 @@ func (dlg *FileDialog) show(owner Form, fun func(ofn *win.OPENFILENAME) bool, fl
 }
 
 func (dlg *FileDialog) ShowOpen(owner Form) (accepted bool, err error) {
-	return dlg.show(owner, win.GetOpenFileName, win.OFN_NOCHANGEDIR)
+	return dlg.show(owner, comdlg32.GetOpenFileName, comdlg32.OFN_NOCHANGEDIR)
 }
 
 func (dlg *FileDialog) ShowOpenMultiple(owner Form) (accepted bool, err error) {
-	return dlg.show(owner, win.GetOpenFileName, win.OFN_ALLOWMULTISELECT|win.OFN_EXPLORER|win.OFN_NOCHANGEDIR)
+	return dlg.show(owner, comdlg32.GetOpenFileName, comdlg32.OFN_ALLOWMULTISELECT|comdlg32.OFN_EXPLORER|comdlg32.OFN_NOCHANGEDIR)
 }
 
 func (dlg *FileDialog) ShowSave(owner Form) (accepted bool, err error) {
-	return dlg.show(owner, win.GetSaveFileName, win.OFN_NOCHANGEDIR)
+	return dlg.show(owner, comdlg32.GetSaveFileName, comdlg32.OFN_NOCHANGEDIR)
 }
 
 func pathFromPIDL(pidl uintptr) (string, error) {
-	var path [win.MAX_PATH]uint16
-	if !win.SHGetPathFromIDList(pidl, &path[0]) {
+	var path [kernel32.MAX_PATH]uint16
+	if !shell32.SHGetPathFromIDList(pidl, &path[0]) {
 		return "", newError("SHGetPathFromIDList failed")
 	}
 
@@ -137,7 +155,7 @@ func pathFromPIDL(pidl uintptr) (string, error) {
 }
 
 // We use this callback to disable the OK button in case of "invalid" selections.
-func browseFolderCallback(hwnd win.HWND, msg uint32, lp, wp uintptr) uintptr {
+func browseFolderCallback(hwnd handle.HWND, msg uint32, lp, wp uintptr) uintptr {
 	const BFFM_SELCHANGED = 2
 	if msg == BFFM_SELCHANGED {
 		_, err := pathFromPIDL(lp)
@@ -146,9 +164,9 @@ func browseFolderCallback(hwnd win.HWND, msg uint32, lp, wp uintptr) uintptr {
 			enabled = 1
 		}
 
-		const BFFM_ENABLEOK = win.WM_USER + 101
+		const BFFM_ENABLEOK = user32.WM_USER + 101
 
-		win.SendMessage(hwnd, BFFM_ENABLEOK, 0, enabled)
+		user32.SendMessage(hwnd, BFFM_ENABLEOK, 0, enabled)
 	}
 
 	return 0
@@ -164,37 +182,44 @@ func init() {
 
 func (dlg *FileDialog) ShowBrowseFolder(owner Form) (accepted bool, err error) {
 	// Calling OleInitialize (or similar) is required for BIF_NEWDIALOGSTYLE.
-	if hr := win.OleInitialize(); hr != win.S_OK && hr != win.S_FALSE {
+	if hr := ole32.OleInitialize(); hr != win.S_OK && hr != win.S_FALSE {
 		return false, newError(fmt.Sprint("OleInitialize Error: ", hr))
 	}
-	defer win.OleUninitialize()
+	defer ole32.OleUninitialize()
 
-	var ownerHwnd win.HWND
+	var ownerHwnd handle.HWND
 	if owner != nil {
 		ownerHwnd = owner.Handle()
 	}
 
 	// We need to put the initial path into a buffer of at least MAX_LENGTH
 	// length, or we may get random crashes.
-	var buf [win.MAX_PATH]uint16
-	copy(buf[:], syscall.StringToUTF16(dlg.InitialDirPath))
+	var buf [kernel32.MAX_PATH]uint16
+	strUtf, err := syscall.UTF16FromString(dlg.InitialDirPath)
+	if err != nil {
+		newError(err.Error())
+	}
+	copy(buf[:], strUtf)
 
 	const BIF_NEWDIALOGSTYLE = 0x00000040
-
-	bi := win.BROWSEINFO{
+	strPtr, err := syscall.UTF16PtrFromString(dlg.Title)
+	if err != nil {
+		newError(err.Error())
+	}
+	bi := shell32.BROWSEINFO{
 		HwndOwner: ownerHwnd,
-		LpszTitle: syscall.StringToUTF16Ptr(dlg.Title),
+		LpszTitle: strPtr,
 		UlFlags:   BIF_NEWDIALOGSTYLE,
 		Lpfn:      browseFolderCallbackPtr,
 	}
 
-	win.SHParseDisplayName(&buf[0], 0, &bi.PidlRoot, 0, nil)
+	shell32.SHParseDisplayName(&buf[0], 0, &bi.PidlRoot, 0, nil)
 
-	pidl := win.SHBrowseForFolder(&bi)
+	pidl := shell32.SHBrowseForFolder(&bi)
 	if pidl == 0 {
 		return false, nil
 	}
-	defer win.CoTaskMemFree(pidl)
+	defer ole32.CoTaskMemFree(pidl)
 
 	dlg.FilePath, err = pathFromPIDL(pidl)
 	accepted = dlg.FilePath != ""

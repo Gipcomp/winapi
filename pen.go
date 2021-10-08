@@ -4,43 +4,43 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
 )
 
 type PenStyle int
 
 // Pen styles
 const (
-	PenSolid       PenStyle = win.PS_SOLID
-	PenDash        PenStyle = win.PS_DASH
-	PenDot         PenStyle = win.PS_DOT
-	PenDashDot     PenStyle = win.PS_DASHDOT
-	PenDashDotDot  PenStyle = win.PS_DASHDOTDOT
-	PenNull        PenStyle = win.PS_NULL
-	PenInsideFrame PenStyle = win.PS_INSIDEFRAME
-	PenUserStyle   PenStyle = win.PS_USERSTYLE
-	PenAlternate   PenStyle = win.PS_ALTERNATE
+	PenSolid       PenStyle = gdi32.PS_SOLID
+	PenDash        PenStyle = gdi32.PS_DASH
+	PenDot         PenStyle = gdi32.PS_DOT
+	PenDashDot     PenStyle = gdi32.PS_DASHDOT
+	PenDashDotDot  PenStyle = gdi32.PS_DASHDOTDOT
+	PenNull        PenStyle = gdi32.PS_NULL
+	PenInsideFrame PenStyle = gdi32.PS_INSIDEFRAME
+	PenUserStyle   PenStyle = gdi32.PS_USERSTYLE
+	PenAlternate   PenStyle = gdi32.PS_ALTERNATE
 )
 
 // Pen cap styles (geometric pens only)
 const (
-	PenCapRound  PenStyle = win.PS_ENDCAP_ROUND
-	PenCapSquare PenStyle = win.PS_ENDCAP_SQUARE
-	PenCapFlat   PenStyle = win.PS_ENDCAP_FLAT
+	PenCapRound  PenStyle = gdi32.PS_ENDCAP_ROUND
+	PenCapSquare PenStyle = gdi32.PS_ENDCAP_SQUARE
+	PenCapFlat   PenStyle = gdi32.PS_ENDCAP_FLAT
 )
 
 // Pen join styles (geometric pens only)
 const (
-	PenJoinBevel PenStyle = win.PS_JOIN_BEVEL
-	PenJoinMiter PenStyle = win.PS_JOIN_MITER
-	PenJoinRound PenStyle = win.PS_JOIN_ROUND
+	PenJoinBevel PenStyle = gdi32.PS_JOIN_BEVEL
+	PenJoinMiter PenStyle = gdi32.PS_JOIN_MITER
+	PenJoinRound PenStyle = gdi32.PS_JOIN_ROUND
 )
 
 type Pen interface {
-	handleForDPI(dpi int) win.HPEN
+	handleForDPI(dpi int) gdi32.HPEN
 	Dispose()
 	Style() PenStyle
 
@@ -49,13 +49,13 @@ type Pen interface {
 }
 
 type nullPen struct {
-	hPen win.HPEN
+	hPen gdi32.HPEN
 }
 
 func newNullPen() *nullPen {
-	lb := &win.LOGBRUSH{LbStyle: win.BS_NULL}
+	lb := &gdi32.LOGBRUSH{LbStyle: gdi32.BS_NULL}
 
-	hPen := win.ExtCreatePen(win.PS_COSMETIC|win.PS_NULL, 1, lb, 0, nil)
+	hPen := gdi32.ExtCreatePen(gdi32.PS_COSMETIC|gdi32.PS_NULL, 1, lb, 0, nil)
 	if hPen == 0 {
 		panic("failed to create null brush")
 	}
@@ -65,13 +65,13 @@ func newNullPen() *nullPen {
 
 func (p *nullPen) Dispose() {
 	if p.hPen != 0 {
-		win.DeleteObject(win.HGDIOBJ(p.hPen))
+		gdi32.DeleteObject(gdi32.HGDIOBJ(p.hPen))
 
 		p.hPen = 0
 	}
 }
 
-func (p *nullPen) handleForDPI(dpi int) win.HPEN {
+func (p *nullPen) handleForDPI(dpi int) gdi32.HPEN {
 	return p.hPen
 }
 
@@ -96,17 +96,17 @@ func NullPen() Pen {
 }
 
 type CosmeticPen struct {
-	hPen  win.HPEN
+	hPen  gdi32.HPEN
 	style PenStyle
 	color Color
 }
 
 func NewCosmeticPen(style PenStyle, color Color) (*CosmeticPen, error) {
-	lb := &win.LOGBRUSH{LbStyle: win.BS_SOLID, LbColor: win.COLORREF(color)}
+	lb := &gdi32.LOGBRUSH{LbStyle: gdi32.BS_SOLID, LbColor: gdi32.COLORREF(color)}
 
-	style |= win.PS_COSMETIC
+	style |= gdi32.PS_COSMETIC
 
-	hPen := win.ExtCreatePen(uint32(style), 1, lb, 0, nil)
+	hPen := gdi32.ExtCreatePen(uint32(style), 1, lb, 0, nil)
 	if hPen == 0 {
 		return nil, newError("ExtCreatePen failed")
 	}
@@ -116,13 +116,13 @@ func NewCosmeticPen(style PenStyle, color Color) (*CosmeticPen, error) {
 
 func (p *CosmeticPen) Dispose() {
 	if p.hPen != 0 {
-		win.DeleteObject(win.HGDIOBJ(p.hPen))
+		gdi32.DeleteObject(gdi32.HGDIOBJ(p.hPen))
 
 		p.hPen = 0
 	}
 }
 
-func (p *CosmeticPen) handleForDPI(dpi int) win.HPEN {
+func (p *CosmeticPen) handleForDPI(dpi int) gdi32.HPEN {
 	return p.hPen
 }
 
@@ -139,7 +139,7 @@ func (p *CosmeticPen) Width() int {
 }
 
 type GeometricPen struct {
-	dpi2hPen   map[int]win.HPEN
+	dpi2hPen   map[int]gdi32.HPEN
 	style      PenStyle
 	brush      Brush
 	width96dpi int
@@ -151,7 +151,7 @@ func NewGeometricPen(style PenStyle, width int, brush Brush) (*GeometricPen, err
 		return nil, newError("brush cannot be nil")
 	}
 
-	style |= win.PS_GEOMETRIC
+	style |= gdi32.PS_GEOMETRIC
 
 	return &GeometricPen{
 		style:      style,
@@ -166,24 +166,24 @@ func (p *GeometricPen) Dispose() {
 	}
 
 	for dpi, hPen := range p.dpi2hPen {
-		win.DeleteObject(win.HGDIOBJ(hPen))
+		gdi32.DeleteObject(gdi32.HGDIOBJ(hPen))
 		delete(p.dpi2hPen, dpi)
 	}
 }
 
-func (p *GeometricPen) handleForDPI(dpi int) win.HPEN {
+func (p *GeometricPen) handleForDPI(dpi int) gdi32.HPEN {
 	hPen, _ := p.handleForDPIWithError(dpi)
 	return hPen
 }
 
-func (p *GeometricPen) handleForDPIWithError(dpi int) (win.HPEN, error) {
+func (p *GeometricPen) handleForDPIWithError(dpi int) (gdi32.HPEN, error) {
 	if p.dpi2hPen == nil {
-		p.dpi2hPen = make(map[int]win.HPEN)
+		p.dpi2hPen = make(map[int]gdi32.HPEN)
 	} else if handle, ok := p.dpi2hPen[dpi]; ok {
 		return handle, nil
 	}
 
-	hPen := win.ExtCreatePen(
+	hPen := gdi32.ExtCreatePen(
 		uint32(p.style),
 		uint32(IntFrom96DPI(p.width96dpi, dpi)),
 		p.brush.logbrush(), 0, nil)

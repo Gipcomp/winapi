@@ -4,14 +4,19 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"fmt"
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/comctl32"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 type ToolBarButtonStyle int
@@ -35,13 +40,13 @@ type ToolBar struct {
 func NewToolBarWithOrientationAndButtonStyle(parent Container, orientation Orientation, buttonStyle ToolBarButtonStyle) (*ToolBar, error) {
 	var style uint32
 	if orientation == Vertical {
-		style = win.CCS_VERT | win.CCS_NORESIZE
+		style = comctl32.CCS_VERT | comctl32.CCS_NORESIZE
 	} else {
-		style = win.TBSTYLE_WRAPABLE
+		style = commctrl.TBSTYLE_WRAPABLE
 	}
 
 	if buttonStyle != ToolBarButtonImageAboveText {
-		style |= win.TBSTYLE_LIST
+		style |= commctrl.TBSTYLE_LIST
 	}
 
 	tb := &ToolBar{
@@ -57,14 +62,14 @@ func NewToolBarWithOrientationAndButtonStyle(parent Container, orientation Orien
 		tb,
 		parent,
 		"ToolbarWindow32",
-		win.CCS_NODIVIDER|win.TBSTYLE_FLAT|win.TBSTYLE_TOOLTIPS|style,
+		comctl32.CCS_NODIVIDER|commctrl.TBSTYLE_FLAT|commctrl.TBSTYLE_TOOLTIPS|style,
 		0); err != nil {
 		return nil, err
 	}
 
-	exStyle := tb.SendMessage(win.TB_GETEXTENDEDSTYLE, 0, 0)
-	exStyle |= win.TBSTYLE_EX_DRAWDDARROWS | win.TBSTYLE_EX_MIXEDBUTTONS
-	tb.SendMessage(win.TB_SETEXTENDEDSTYLE, 0, exStyle)
+	exStyle := tb.SendMessage(commctrl.TB_GETEXTENDEDSTYLE, 0, 0)
+	exStyle |= commctrl.TBSTYLE_EX_DRAWDDARROWS | commctrl.TBSTYLE_EX_MIXEDBUTTONS
+	tb.SendMessage(commctrl.TB_SETEXTENDEDSTYLE, 0, exStyle)
 
 	return tb, nil
 }
@@ -113,7 +118,7 @@ func (tb *ToolBar) ApplyDPI(dpi int) {
 		return
 	}
 
-	tb.SendMessage(win.TB_SETIMAGELIST, 0, uintptr(iml.hIml))
+	tb.SendMessage(commctrl.TB_SETIMAGELIST, 0, uintptr(iml.hIml))
 
 	if tb.imageList != nil {
 		tb.imageList.Dispose()
@@ -132,9 +137,9 @@ func (tb *ToolBar) ApplyDPI(dpi int) {
 }
 
 func (tb *ToolBar) Orientation() Orientation {
-	style := win.GetWindowLong(tb.hWnd, win.GWL_STYLE)
+	style := user32.GetWindowLong(tb.hWnd, user32.GWL_STYLE)
 
-	if style&win.CCS_VERT > 0 {
+	if style&comctl32.CCS_VERT > 0 {
 		return Vertical
 	}
 
@@ -154,15 +159,15 @@ func (tb *ToolBar) applyDefaultButtonWidth() error {
 	width := IntFrom96DPI(tb.defaultButtonWidth, dpi)
 
 	lParam := uintptr(win.MAKELONG(uint16(width), uint16(width)))
-	if 0 == tb.SendMessage(win.TB_SETBUTTONWIDTH, 0, lParam) {
+	if tb.SendMessage(commctrl.TB_SETBUTTONWIDTH, 0, lParam) == 0 {
 		return newError("SendMessage(TB_SETBUTTONWIDTH)")
 	}
 
-	size := uint32(tb.SendMessage(win.TB_GETBUTTONSIZE, 0, 0))
+	size := uint32(tb.SendMessage(commctrl.TB_GETBUTTONSIZE, 0, 0))
 	height := win.HIWORD(size)
 
 	lParam = uintptr(win.MAKELONG(uint16(width), height))
-	if win.FALSE == tb.SendMessage(win.TB_SETBUTTONSIZE, 0, lParam) {
+	if win.FALSE == tb.SendMessage(commctrl.TB_SETBUTTONSIZE, 0, lParam) {
 		return newError("SendMessage(TB_SETBUTTONSIZE)")
 	}
 
@@ -211,7 +216,7 @@ func (tb *ToolBar) MaxTextRows() int {
 }
 
 func (tb *ToolBar) SetMaxTextRows(maxTextRows int) error {
-	if 0 == tb.SendMessage(win.TB_SETMAXTEXTROWS, uintptr(maxTextRows), 0) {
+	if tb.SendMessage(commctrl.TB_SETMAXTEXTROWS, uintptr(maxTextRows), 0) == 0 {
 		return newError("SendMessage(TB_SETMAXTEXTROWS)")
 	}
 
@@ -229,13 +234,13 @@ func (tb *ToolBar) ImageList() *ImageList {
 }
 
 func (tb *ToolBar) SetImageList(value *ImageList) {
-	var hIml win.HIMAGELIST
+	var hIml comctl32.HIMAGELIST
 
 	if tb.buttonStyle != ToolBarButtonTextOnly && value != nil {
 		hIml = value.hIml
 	}
 
-	tb.SendMessage(win.TB_SETIMAGELIST, 0, uintptr(hIml))
+	tb.SendMessage(commctrl.TB_SETIMAGELIST, 0, uintptr(hIml))
 
 	tb.imageList = value
 }
@@ -261,14 +266,14 @@ func (tb *ToolBar) imageIndex(image Image) (imageIndex int32, err error) {
 	return
 }
 
-func (tb *ToolBar) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (tb *ToolBar) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_MOUSEMOVE, win.WM_MOUSELEAVE, win.WM_LBUTTONDOWN:
+	case user32.WM_MOUSEMOVE, user32.WM_MOUSELEAVE, user32.WM_LBUTTONDOWN:
 		tb.Invalidate()
 
-	case win.WM_COMMAND:
+	case user32.WM_COMMAND:
 		switch win.HIWORD(uint32(wParam)) {
-		case win.BN_CLICKED:
+		case user32.BN_CLICKED:
 			actionId := uint16(win.LOWORD(uint32(wParam)))
 			if action, ok := actionsById[actionId]; ok {
 				action.raiseTriggered()
@@ -276,89 +281,89 @@ func (tb *ToolBar) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) ui
 			}
 		}
 
-	case win.WM_NOTIFY:
-		nmhdr := (*win.NMHDR)(unsafe.Pointer(lParam))
+	case user32.WM_NOTIFY:
+		nmhdr := (*user32.NMHDR)(unsafe.Pointer(lParam))
 
 		switch int32(nmhdr.Code) {
-		case win.TBN_DROPDOWN:
-			nmtb := (*win.NMTOOLBAR)(unsafe.Pointer(lParam))
+		case commctrl.TBN_DROPDOWN:
+			nmtb := (*commctrl.NMTOOLBAR)(unsafe.Pointer(lParam))
 			actionId := uint16(nmtb.IItem)
 			if action := actionsById[actionId]; action != nil {
-				var r win.RECT
-				if 0 == tb.SendMessage(win.TB_GETRECT, uintptr(actionId), uintptr(unsafe.Pointer(&r))) {
+				var r gdi32.RECT
+				if tb.SendMessage(commctrl.TB_GETRECT, uintptr(actionId), uintptr(unsafe.Pointer(&r))) == 0 {
 					break
 				}
 
-				p := win.POINT{r.Left, r.Bottom}
+				p := gdi32.POINT{X: r.Left, Y: r.Bottom}
 
-				if !win.ClientToScreen(tb.hWnd, &p) {
+				if !user32.ClientToScreen(tb.hWnd, &p) {
 					break
 				}
 
 				action.menu.updateItemsWithImageForWindow(tb)
 
-				win.TrackPopupMenuEx(
+				user32.TrackPopupMenuEx(
 					action.menu.hMenu,
-					win.TPM_NOANIMATION,
+					user32.TPM_NOANIMATION,
 					p.X,
 					p.Y,
 					tb.hWnd,
 					nil)
 
-				return win.TBDDRET_DEFAULT
+				return commctrl.TBDDRET_DEFAULT
 			}
 		}
 
-	case win.WM_WINDOWPOSCHANGED:
-		wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
+	case user32.WM_WINDOWPOSCHANGED:
+		wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
 
-		if wp.Flags&win.SWP_NOSIZE != 0 {
+		if wp.Flags&user32.SWP_NOSIZE != 0 {
 			break
 		}
 
-		tb.SendMessage(win.TB_AUTOSIZE, 0, 0)
+		tb.SendMessage(commctrl.TB_AUTOSIZE, 0, 0)
 	}
 
 	return tb.WidgetBase.WndProc(hwnd, msg, wParam, lParam)
 }
 
 func (tb *ToolBar) initButtonForAction(action *Action, state, style *byte, image *int32, text *uintptr) (err error) {
-	if tb.hasStyleBits(win.CCS_VERT) {
-		*state |= win.TBSTATE_WRAP
+	if tb.hasStyleBits(comctl32.CCS_VERT) {
+		*state |= commctrl.TBSTATE_WRAP
 	} else if tb.defaultButtonWidth == 0 {
-		*style |= win.BTNS_AUTOSIZE
+		*style |= commctrl.BTNS_AUTOSIZE
 	}
 
 	if action.checked {
-		*state |= win.TBSTATE_CHECKED
+		*state |= commctrl.TBSTATE_CHECKED
 	}
 
 	if action.enabled {
-		*state |= win.TBSTATE_ENABLED
+		*state |= commctrl.TBSTATE_ENABLED
 	}
 
 	if action.checkable {
-		*style |= win.BTNS_CHECK
+		*style |= commctrl.BTNS_CHECK
 	}
 
 	if action.exclusive {
-		*style |= win.BTNS_GROUP
+		*style |= commctrl.BTNS_GROUP
 	}
 
 	if tb.buttonStyle != ToolBarButtonImageOnly && len(action.text) > 0 {
-		*style |= win.BTNS_SHOWTEXT
+		*style |= commctrl.BTNS_SHOWTEXT
 	}
 
 	if action.menu != nil {
 		if len(action.Triggered().handlers) > 0 {
-			*style |= win.BTNS_DROPDOWN
+			*style |= commctrl.BTNS_DROPDOWN
 		} else {
-			*style |= win.BTNS_WHOLEDROPDOWN
+			*style |= commctrl.BTNS_WHOLEDROPDOWN
 		}
 	}
 
 	if action.IsSeparator() {
-		*style = win.BTNS_SEP
+		*style = commctrl.BTNS_SEP
 	}
 
 	if tb.buttonStyle != ToolBarButtonTextOnly {
@@ -375,18 +380,26 @@ func (tb *ToolBar) initButtonForAction(action *Action, state, style *byte, image
 	}
 
 	if len(actionText) != 0 {
-		*text = uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(actionText)))
+		strPtr, err := syscall.UTF16PtrFromString(actionText)
+		if err != nil {
+			return err
+		}
+		*text = uintptr(unsafe.Pointer(strPtr))
 	} else if len(action.toolTip) != 0 {
-		*text = uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(action.toolTip)))
+		strPtr, err := syscall.UTF16PtrFromString(action.toolTip)
+		if err != nil {
+			return err
+		}
+		*text = uintptr(unsafe.Pointer(strPtr))
 	}
 
 	return
 }
 
 func (tb *ToolBar) onActionChanged(action *Action) error {
-	tbbi := win.TBBUTTONINFO{
-		DwMask: win.TBIF_IMAGE | win.TBIF_STATE | win.TBIF_STYLE | win.TBIF_TEXT,
-		IImage: win.I_IMAGENONE,
+	tbbi := commctrl.TBBUTTONINFO{
+		DwMask: commctrl.TBIF_IMAGE | commctrl.TBIF_STATE | commctrl.TBIF_STYLE | commctrl.TBIF_TEXT,
+		IImage: comctl32.I_IMAGENONE,
 	}
 
 	tbbi.CbSize = uint32(unsafe.Sizeof(tbbi))
@@ -401,10 +414,10 @@ func (tb *ToolBar) onActionChanged(action *Action) error {
 		return err
 	}
 
-	if 0 == tb.SendMessage(
-		win.TB_SETBUTTONINFO,
+	if tb.SendMessage(
+		commctrl.TB_SETBUTTONINFO,
 		uintptr(action.id),
-		uintptr(unsafe.Pointer(&tbbi))) {
+		uintptr(unsafe.Pointer(&tbbi))) == 0 {
 
 		return newError("SendMessage(TB_SETBUTTONINFO) failed")
 	}
@@ -442,7 +455,7 @@ func (tb *ToolBar) insertAction(action *Action, visibleChanged bool) (err error)
 
 	index := tb.actions.indexInObserver(action)
 
-	tbb := win.TBBUTTON{
+	tbb := commctrl.TBBUTTON{
 		IdCommand: int32(action.id),
 	}
 
@@ -458,9 +471,9 @@ func (tb *ToolBar) insertAction(action *Action, visibleChanged bool) (err error)
 
 	tb.SetVisible(true)
 
-	tb.SendMessage(win.TB_BUTTONSTRUCTSIZE, uintptr(unsafe.Sizeof(tbb)), 0)
+	tb.SendMessage(commctrl.TB_BUTTONSTRUCTSIZE, uintptr(unsafe.Sizeof(tbb)), 0)
 
-	if win.FALSE == tb.SendMessage(win.TB_INSERTBUTTON, uintptr(index), uintptr(unsafe.Pointer(&tbb))) {
+	if win.FALSE == tb.SendMessage(commctrl.TB_INSERTBUTTON, uintptr(index), uintptr(unsafe.Pointer(&tbb))) {
 		return newError("SendMessage(TB_ADDBUTTONS)")
 	}
 
@@ -468,7 +481,7 @@ func (tb *ToolBar) insertAction(action *Action, visibleChanged bool) (err error)
 		return
 	}
 
-	tb.SendMessage(win.TB_AUTOSIZE, 0, 0)
+	tb.SendMessage(commctrl.TB_AUTOSIZE, 0, 0)
 
 	tb.RequestLayout()
 
@@ -482,7 +495,7 @@ func (tb *ToolBar) removeAction(action *Action, visibleChanged bool) error {
 		action.removeChangedHandler(tb)
 	}
 
-	if 0 == tb.SendMessage(win.TB_DELETEBUTTON, uintptr(index), 0) {
+	if tb.SendMessage(commctrl.TB_DELETEBUTTON, uintptr(index), 0) == 0 {
 		return newError("SendMessage(TB_DELETEBUTTON) failed")
 	}
 
@@ -512,7 +525,7 @@ func (tb *ToolBar) onClearingActions() error {
 }
 
 func (tb *ToolBar) CreateLayoutItem(ctx *LayoutContext) LayoutItem {
-	buttonSize := uint32(tb.SendMessage(win.TB_GETBUTTONSIZE, 0, 0))
+	buttonSize := uint32(tb.SendMessage(commctrl.TB_GETBUTTONSIZE, 0, 0))
 
 	dpi := tb.DPI()
 	width := IntFrom96DPI(tb.defaultButtonWidth, dpi)
@@ -522,7 +535,7 @@ func (tb *ToolBar) CreateLayoutItem(ctx *LayoutContext) LayoutItem {
 
 	height := int(win.HIWORD(buttonSize))
 
-	var size win.SIZE
+	var size gdi32.SIZE
 	var wp uintptr
 	var layoutFlags LayoutFlags
 
@@ -536,7 +549,7 @@ func (tb *ToolBar) CreateLayoutItem(ctx *LayoutContext) LayoutItem {
 		//layoutFlags = ShrinkableHorz | GrowableHorz
 	}
 
-	if win.FALSE != tb.SendMessage(win.TB_GETIDEALSIZE, wp, uintptr(unsafe.Pointer(&size))) {
+	if win.FALSE != tb.SendMessage(commctrl.TB_GETIDEALSIZE, wp, uintptr(unsafe.Pointer(&size))) {
 		if wp == win.TRUE {
 			height = int(size.CY)
 		} else {

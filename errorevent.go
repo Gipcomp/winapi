@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 type errorEventHandlerInfo struct {
 	handler ErrorEventHandler

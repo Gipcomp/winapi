@@ -4,12 +4,14 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
 )
 
 const customWidgetWindowClass = `\o/ Walk_CustomWidget_Class \o/`
@@ -70,7 +72,7 @@ func (cw *CustomWidget) init(parent Container, style uint) error {
 		cw,
 		parent,
 		customWidgetWindowClass,
-		win.WS_VISIBLE|uint32(style),
+		user32.WS_VISIBLE|uint32(style),
 		0); err != nil {
 		return err
 	}
@@ -110,21 +112,21 @@ func (cw *CustomWidget) SetPaintMode(value PaintMode) {
 	cw.paintMode = value
 }
 
-func (cw *CustomWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (cw *CustomWidget) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_PAINT:
+	case user32.WM_PAINT:
 		if cw.paint == nil && cw.paintPixels == nil {
 			newError("paint(Pixels) func is nil")
 			break
 		}
 
-		var ps win.PAINTSTRUCT
+		var ps user32.PAINTSTRUCT
 
-		var hdc win.HDC
+		var hdc gdi32.HDC
 		if wParam == 0 {
-			hdc = win.BeginPaint(cw.hWnd, &ps)
+			hdc = user32.BeginPaint(cw.hWnd, &ps)
 		} else {
-			hdc = win.HDC(wParam)
+			hdc = gdi32.HDC(wParam)
 		}
 		if hdc == 0 {
 			newError("BeginPaint failed")
@@ -132,7 +134,7 @@ func (cw *CustomWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintpt
 		}
 		defer func() {
 			if wParam == 0 {
-				win.EndPaint(cw.hWnd, &ps)
+				user32.EndPaint(cw.hWnd, &ps)
 			}
 		}()
 
@@ -159,18 +161,18 @@ func (cw *CustomWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintpt
 
 		return 0
 
-	case win.WM_ERASEBKGND:
+	case user32.WM_ERASEBKGND:
 		if cw.paintMode != PaintNormal {
 			return 1
 		}
 
-	case win.WM_PRINTCLIENT:
-		win.SendMessage(hwnd, win.WM_PAINT, wParam, lParam)
+	case user32.WM_PRINTCLIENT:
+		user32.SendMessage(hwnd, user32.WM_PAINT, wParam, lParam)
 
-	case win.WM_WINDOWPOSCHANGED:
-		wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
+	case user32.WM_WINDOWPOSCHANGED:
+		wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
 
-		if wp.Flags&win.SWP_NOSIZE != 0 {
+		if wp.Flags&user32.SWP_NOSIZE != 0 {
 			break
 		}
 
@@ -184,11 +186,11 @@ func (cw *CustomWidget) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintpt
 
 // bufferedPaint draws widget on a memory buffer. updateBounds are in native pixels.
 func (cw *CustomWidget) bufferedPaint(canvas *Canvas, updateBounds Rectangle) error {
-	hdc := win.CreateCompatibleDC(canvas.hdc)
+	hdc := gdi32.CreateCompatibleDC(canvas.hdc)
 	if hdc == 0 {
 		return newError("CreateCompatibleDC failed")
 	}
-	defer win.DeleteDC(hdc)
+	defer gdi32.DeleteDC(hdc)
 
 	buffered := Canvas{hdc: hdc, doNotDispose: true}
 	if _, err := buffered.init(); err != nil {
@@ -202,20 +204,20 @@ func (cw *CustomWidget) bufferedPaint(canvas *Canvas, updateBounds Rectangle) er
 	if h < 1 {
 		h = 1
 	}
-	hbmp := win.CreateCompatibleBitmap(canvas.hdc, w, h)
+	hbmp := gdi32.CreateCompatibleBitmap(canvas.hdc, w, h)
 	if hbmp == 0 {
 		return lastError("CreateCompatibleBitmap failed")
 	}
-	defer win.DeleteObject(win.HGDIOBJ(hbmp))
+	defer gdi32.DeleteObject(gdi32.HGDIOBJ(hbmp))
 
-	oldbmp := win.SelectObject(buffered.hdc, win.HGDIOBJ(hbmp))
+	oldbmp := gdi32.SelectObject(buffered.hdc, gdi32.HGDIOBJ(hbmp))
 	if oldbmp == 0 {
 		return newError("SelectObject failed")
 	}
-	defer win.SelectObject(buffered.hdc, oldbmp)
+	defer gdi32.SelectObject(buffered.hdc, oldbmp)
 
-	win.SetViewportOrgEx(buffered.hdc, -int32(updateBounds.X), -int32(updateBounds.Y), nil)
-	win.SetBrushOrgEx(buffered.hdc, -int32(updateBounds.X), -int32(updateBounds.Y), nil)
+	gdi32.SetViewportOrgEx(buffered.hdc, -int32(updateBounds.X), -int32(updateBounds.Y), nil)
+	gdi32.SetBrushOrgEx(buffered.hdc, -int32(updateBounds.X), -int32(updateBounds.Y), nil)
 
 	var err error
 	if cw.paintPixels != nil {
@@ -224,10 +226,10 @@ func (cw *CustomWidget) bufferedPaint(canvas *Canvas, updateBounds Rectangle) er
 		err = cw.paint(&buffered, RectangleTo96DPI(updateBounds, cw.DPI()))
 	}
 
-	if !win.BitBlt(canvas.hdc,
+	if !gdi32.BitBlt(canvas.hdc,
 		int32(updateBounds.X), int32(updateBounds.Y), w, h,
 		buffered.hdc,
-		int32(updateBounds.X), int32(updateBounds.Y), win.SRCCOPY) {
+		int32(updateBounds.X), int32(updateBounds.Y), gdi32.SRCCOPY) {
 		return lastError("buffered BitBlt failed")
 	}
 

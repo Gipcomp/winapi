@@ -4,52 +4,52 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
+
+	"github.com/Gipcomp/win32/ole32"
+	"github.com/Gipcomp/win32/shdocvw"
+	"github.com/Gipcomp/win32/win"
 )
 
-import (
-	"github.com/lxn/win"
-)
-
-var webViewIOleClientSiteVtbl *win.IOleClientSiteVtbl
+var webViewIOleClientSiteVtbl *ole32.IOleClientSiteVtbl
 
 func init() {
 	AppendToWalkInit(func() {
-		webViewIOleClientSiteVtbl = &win.IOleClientSiteVtbl{
-			syscall.NewCallback(webView_IOleClientSite_QueryInterface),
-			syscall.NewCallback(webView_IOleClientSite_AddRef),
-			syscall.NewCallback(webView_IOleClientSite_Release),
-			syscall.NewCallback(webView_IOleClientSite_SaveObject),
-			syscall.NewCallback(webView_IOleClientSite_GetMoniker),
-			syscall.NewCallback(webView_IOleClientSite_GetContainer),
-			syscall.NewCallback(webView_IOleClientSite_ShowObject),
-			syscall.NewCallback(webView_IOleClientSite_OnShowWindow),
-			syscall.NewCallback(webView_IOleClientSite_RequestNewObjectLayout),
+		webViewIOleClientSiteVtbl = &ole32.IOleClientSiteVtbl{
+			QueryInterface:         syscall.NewCallback(webView_IOleClientSite_QueryInterface),
+			AddRef:                 syscall.NewCallback(webView_IOleClientSite_AddRef),
+			Release:                syscall.NewCallback(webView_IOleClientSite_Release),
+			SaveObject:             syscall.NewCallback(webView_IOleClientSite_SaveObject),
+			GetMoniker:             syscall.NewCallback(webView_IOleClientSite_GetMoniker),
+			GetContainer:           syscall.NewCallback(webView_IOleClientSite_GetContainer),
+			ShowObject:             syscall.NewCallback(webView_IOleClientSite_ShowObject),
+			OnShowWindow:           syscall.NewCallback(webView_IOleClientSite_OnShowWindow),
+			RequestNewObjectLayout: syscall.NewCallback(webView_IOleClientSite_RequestNewObjectLayout),
 		}
 	})
 }
 
 type webViewIOleClientSite struct {
-	win.IOleClientSite
+	ole32.IOleClientSite
 	inPlaceSite       webViewIOleInPlaceSite
 	docHostUIHandler  webViewIDocHostUIHandler
 	webBrowserEvents2 webViewDWebBrowserEvents2
 }
 
-func webView_IOleClientSite_QueryInterface(clientSite *webViewIOleClientSite, riid win.REFIID, ppvObject *unsafe.Pointer) uintptr {
-	if win.EqualREFIID(riid, &win.IID_IUnknown) {
+func webView_IOleClientSite_QueryInterface(clientSite *webViewIOleClientSite, riid ole32.REFIID, ppvObject *unsafe.Pointer) uintptr {
+	if ole32.EqualREFIID(riid, &ole32.IID_IUnknown) {
 		*ppvObject = unsafe.Pointer(clientSite)
-	} else if win.EqualREFIID(riid, &win.IID_IOleClientSite) {
+	} else if ole32.EqualREFIID(riid, &ole32.IID_IOleClientSite) {
 		*ppvObject = unsafe.Pointer(clientSite)
-	} else if win.EqualREFIID(riid, &win.IID_IOleInPlaceSite) {
+	} else if ole32.EqualREFIID(riid, &ole32.IID_IOleInPlaceSite) {
 		*ppvObject = unsafe.Pointer(&clientSite.inPlaceSite)
-	} else if win.EqualREFIID(riid, &win.IID_IDocHostUIHandler) {
+	} else if ole32.EqualREFIID(riid, &shdocvw.IID_IDocHostUIHandler) {
 		*ppvObject = unsafe.Pointer(&clientSite.docHostUIHandler)
-	} else if win.EqualREFIID(riid, &win.DIID_DWebBrowserEvents2) {
+	} else if ole32.EqualREFIID(riid, &shdocvw.DIID_DWebBrowserEvents2) {
 		*ppvObject = unsafe.Pointer(&clientSite.webBrowserEvents2)
 	} else {
 		*ppvObject = nil

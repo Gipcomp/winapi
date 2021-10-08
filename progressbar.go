@@ -4,10 +4,12 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/comctl32"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 type ProgressBar struct {
@@ -21,7 +23,7 @@ func NewProgressBar(parent Container) (*ProgressBar, error) {
 		pb,
 		parent,
 		"msctls_progress32",
-		win.WS_VISIBLE,
+		user32.WS_VISIBLE,
 		0); err != nil {
 		return nil, err
 	}
@@ -30,35 +32,35 @@ func NewProgressBar(parent Container) (*ProgressBar, error) {
 }
 
 func (pb *ProgressBar) MinValue() int {
-	return int(pb.SendMessage(win.PBM_GETRANGE, 1, 0))
+	return int(pb.SendMessage(comctl32.PBM_GETRANGE, 1, 0))
 }
 
 func (pb *ProgressBar) MaxValue() int {
-	return int(pb.SendMessage(win.PBM_GETRANGE, 0, 0))
+	return int(pb.SendMessage(comctl32.PBM_GETRANGE, 0, 0))
 }
 
 func (pb *ProgressBar) SetRange(min, max int) {
-	pb.SendMessage(win.PBM_SETRANGE32, uintptr(min), uintptr(max))
+	pb.SendMessage(comctl32.PBM_SETRANGE32, uintptr(min), uintptr(max))
 }
 
 func (pb *ProgressBar) Value() int {
-	return int(pb.SendMessage(win.PBM_GETPOS, 0, 0))
+	return int(pb.SendMessage(comctl32.PBM_GETPOS, 0, 0))
 }
 
 func (pb *ProgressBar) SetValue(value int) {
-	pb.SendMessage(win.PBM_SETPOS, uintptr(value), 0)
+	pb.SendMessage(comctl32.PBM_SETPOS, uintptr(value), 0)
 }
 
 func (pb *ProgressBar) MarqueeMode() bool {
-	return pb.hasStyleBits(win.PBS_MARQUEE)
+	return pb.hasStyleBits(comctl32.PBS_MARQUEE)
 }
 
 func (pb *ProgressBar) SetMarqueeMode(marqueeMode bool) error {
-	if err := pb.ensureStyleBits(win.PBS_MARQUEE, marqueeMode); err != nil {
+	if err := pb.ensureStyleBits(comctl32.PBS_MARQUEE, marqueeMode); err != nil {
 		return err
 	}
 
-	pb.SendMessage(win.PBM_SETMARQUEE, uintptr(win.BoolToBOOL(marqueeMode)), 0)
+	pb.SendMessage(comctl32.PBM_SETMARQUEE, uintptr(win.BoolToBOOL(marqueeMode)), 0)
 
 	return nil
 }

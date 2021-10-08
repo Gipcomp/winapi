@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 type actionChangedHandler interface {
 	onActionChanged(action *Action) error

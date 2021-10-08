@@ -4,20 +4,21 @@
 
 // +build windows,!walk_use_cgo
 
-package walk
+package winapi
 
 import (
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/user32"
 )
 
 func (fb *FormBase) mainLoop() int {
-	msg := (*win.MSG)(unsafe.Pointer(win.GlobalAlloc(0, unsafe.Sizeof(win.MSG{}))))
-	defer win.GlobalFree(win.HGLOBAL(unsafe.Pointer(msg)))
+	msg := (*user32.MSG)(unsafe.Pointer(kernel32.GlobalAlloc(0, unsafe.Sizeof(user32.MSG{}))))
+	defer kernel32.GlobalFree(kernel32.HGLOBAL(unsafe.Pointer(msg)))
 
 	for fb.hWnd != 0 {
-		switch win.GetMessage(msg, 0, 0, 0) {
+		switch user32.GetMessage(msg, 0, 0, 0) {
 		case 0:
 			return int(msg.WParam)
 
@@ -26,15 +27,15 @@ func (fb *FormBase) mainLoop() int {
 		}
 
 		switch msg.Message {
-		case win.WM_KEYDOWN:
+		case user32.WM_KEYDOWN:
 			if fb.handleKeyDown(msg) {
 				continue
 			}
 		}
 
-		if !win.IsDialogMessage(fb.hWnd, msg) {
-			win.TranslateMessage(msg)
-			win.DispatchMessage(msg)
+		if !user32.IsDialogMessage(fb.hWnd, msg) {
+			user32.TranslateMessage(msg)
+			user32.DispatchMessage(msg)
 		}
 
 		fb.group.RunSynchronized()

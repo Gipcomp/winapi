@@ -4,11 +4,9 @@
 
 // +build windows
 
-package walk
+package winapi
 
-import (
-	"github.com/lxn/win"
-)
+import "github.com/Gipcomp/win32/user32"
 
 const compositeWindowClass = `\o/ Walk_Composite_Class \o/`
 
@@ -31,8 +29,8 @@ func NewCompositeWithStyle(parent Window, style uint32) (*Composite, error) {
 		c,
 		parent,
 		compositeWindowClass,
-		win.WS_CHILD|win.WS_VISIBLE|style,
-		win.WS_EX_CONTROLPARENT); err != nil {
+		user32.WS_CHILD|user32.WS_VISIBLE|style,
+		user32.WS_EX_CONTROLPARENT); err != nil {
 		return nil, err
 	}
 

@@ -4,12 +4,12 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"math"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
 )
 
 type ImageViewMode int
@@ -210,7 +210,7 @@ func (iv *ImageView) drawImage(canvas *Canvas, _ Rectangle) error {
 		return canvas.DrawImageStretchedPixels(iv.image, bounds)
 
 	case ImageViewModeCorner, ImageViewModeCenter:
-		win.IntersectClipRect(canvas.hdc, int32(margin), int32(margin), int32(cb.Width+margin), int32(cb.Height+margin))
+		gdi32.IntersectClipRect(canvas.hdc, int32(margin), int32(margin), int32(cb.Width+margin), int32(cb.Height+margin))
 	}
 
 	var bounds Rectangle

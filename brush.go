@@ -4,66 +4,67 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/user32"
 )
 
 type HatchStyle int
 
 const (
-	HatchHorizontal       HatchStyle = win.HS_HORIZONTAL
-	HatchVertical         HatchStyle = win.HS_VERTICAL
-	HatchForwardDiagonal  HatchStyle = win.HS_FDIAGONAL
-	HatchBackwardDiagonal HatchStyle = win.HS_BDIAGONAL
-	HatchCross            HatchStyle = win.HS_CROSS
-	HatchDiagonalCross    HatchStyle = win.HS_DIAGCROSS
+	HatchHorizontal       HatchStyle = gdi32.HS_HORIZONTAL
+	HatchVertical         HatchStyle = gdi32.HS_VERTICAL
+	HatchForwardDiagonal  HatchStyle = gdi32.HS_FDIAGONAL
+	HatchBackwardDiagonal HatchStyle = gdi32.HS_BDIAGONAL
+	HatchCross            HatchStyle = gdi32.HS_CROSS
+	HatchDiagonalCross    HatchStyle = gdi32.HS_DIAGCROSS
 )
 
 type SystemColor int
 
 const (
-	SysColor3DDkShadow              SystemColor = win.COLOR_3DDKSHADOW
-	SysColor3DFace                  SystemColor = win.COLOR_3DFACE
-	SysColor3DHighlight             SystemColor = win.COLOR_3DHIGHLIGHT
-	SysColor3DLight                 SystemColor = win.COLOR_3DLIGHT
-	SysColor3DShadow                SystemColor = win.COLOR_3DSHADOW
-	SysColorActiveBorder            SystemColor = win.COLOR_ACTIVEBORDER
-	SysColorActiveCaption           SystemColor = win.COLOR_ACTIVECAPTION
-	SysColorAppWorkspace            SystemColor = win.COLOR_APPWORKSPACE
-	SysColorBackground              SystemColor = win.COLOR_BACKGROUND
-	SysColorDesktop                 SystemColor = win.COLOR_DESKTOP
-	SysColorBtnFace                 SystemColor = win.COLOR_BTNFACE
-	SysColorBtnHighlight            SystemColor = win.COLOR_BTNHIGHLIGHT
-	SysColorBtnShadow               SystemColor = win.COLOR_BTNSHADOW
-	SysColorBtnText                 SystemColor = win.COLOR_BTNTEXT
-	SysColorCaptionText             SystemColor = win.COLOR_CAPTIONTEXT
-	SysColorGrayText                SystemColor = win.COLOR_GRAYTEXT
-	SysColorHighlight               SystemColor = win.COLOR_HIGHLIGHT
-	SysColorHighlightText           SystemColor = win.COLOR_HIGHLIGHTTEXT
-	SysColorInactiveBorder          SystemColor = win.COLOR_INACTIVEBORDER
-	SysColorInactiveCaption         SystemColor = win.COLOR_INACTIVECAPTION
-	SysColorInactiveCaptionText     SystemColor = win.COLOR_INACTIVECAPTIONTEXT
-	SysColorInfoBk                  SystemColor = win.COLOR_INFOBK
-	SysColorInfoText                SystemColor = win.COLOR_INFOTEXT
-	SysColorMenu                    SystemColor = win.COLOR_MENU
-	SysColorMenuText                SystemColor = win.COLOR_MENUTEXT
-	SysColorScrollBar               SystemColor = win.COLOR_SCROLLBAR
-	SysColorWindow                  SystemColor = win.COLOR_WINDOW
-	SysColorWindowFrame             SystemColor = win.COLOR_WINDOWFRAME
-	SysColorWindowText              SystemColor = win.COLOR_WINDOWTEXT
-	SysColorHotLight                SystemColor = win.COLOR_HOTLIGHT
-	SysColorGradientActiveCaption   SystemColor = win.COLOR_GRADIENTACTIVECAPTION
-	SysColorGradientInactiveCaption SystemColor = win.COLOR_GRADIENTINACTIVECAPTION
+	SysColor3DDkShadow              SystemColor = user32.COLOR_3DDKSHADOW
+	SysColor3DFace                  SystemColor = user32.COLOR_3DFACE
+	SysColor3DHighlight             SystemColor = user32.COLOR_3DHIGHLIGHT
+	SysColor3DLight                 SystemColor = user32.COLOR_3DLIGHT
+	SysColor3DShadow                SystemColor = user32.COLOR_3DSHADOW
+	SysColorActiveBorder            SystemColor = user32.COLOR_ACTIVEBORDER
+	SysColorActiveCaption           SystemColor = user32.COLOR_ACTIVECAPTION
+	SysColorAppWorkspace            SystemColor = user32.COLOR_APPWORKSPACE
+	SysColorBackground              SystemColor = user32.COLOR_BACKGROUND
+	SysColorDesktop                 SystemColor = user32.COLOR_DESKTOP
+	SysColorBtnFace                 SystemColor = user32.COLOR_BTNFACE
+	SysColorBtnHighlight            SystemColor = user32.COLOR_BTNHIGHLIGHT
+	SysColorBtnShadow               SystemColor = user32.COLOR_BTNSHADOW
+	SysColorBtnText                 SystemColor = user32.COLOR_BTNTEXT
+	SysColorCaptionText             SystemColor = user32.COLOR_CAPTIONTEXT
+	SysColorGrayText                SystemColor = user32.COLOR_GRAYTEXT
+	SysColorHighlight               SystemColor = user32.COLOR_HIGHLIGHT
+	SysColorHighlightText           SystemColor = user32.COLOR_HIGHLIGHTTEXT
+	SysColorInactiveBorder          SystemColor = user32.COLOR_INACTIVEBORDER
+	SysColorInactiveCaption         SystemColor = user32.COLOR_INACTIVECAPTION
+	SysColorInactiveCaptionText     SystemColor = user32.COLOR_INACTIVECAPTIONTEXT
+	SysColorInfoBk                  SystemColor = user32.COLOR_INFOBK
+	SysColorInfoText                SystemColor = user32.COLOR_INFOTEXT
+	SysColorMenu                    SystemColor = user32.COLOR_MENU
+	SysColorMenuText                SystemColor = user32.COLOR_MENUTEXT
+	SysColorScrollBar               SystemColor = user32.COLOR_SCROLLBAR
+	SysColorWindow                  SystemColor = user32.COLOR_WINDOW
+	SysColorWindowFrame             SystemColor = user32.COLOR_WINDOWFRAME
+	SysColorWindowText              SystemColor = user32.COLOR_WINDOWTEXT
+	SysColorHotLight                SystemColor = user32.COLOR_HOTLIGHT
+	SysColorGradientActiveCaption   SystemColor = user32.COLOR_GRADIENTACTIVECAPTION
+	SysColorGradientInactiveCaption SystemColor = user32.COLOR_GRADIENTINACTIVECAPTION
 )
 
 type Brush interface {
 	Dispose()
-	handle() win.HBRUSH
-	logbrush() *win.LOGBRUSH
+	handle() gdi32.HBRUSH
+	logbrush() *gdi32.LOGBRUSH
 	attachWindow(wb *WindowBase)
 	detachWindow(wb *WindowBase)
 	simple() bool
@@ -80,19 +81,19 @@ type windowBrushInfo struct {
 }
 
 type brushBase struct {
-	hBrush  win.HBRUSH
+	hBrush  gdi32.HBRUSH
 	wb2info map[*WindowBase]*windowBrushInfo
 }
 
 func (bb *brushBase) Dispose() {
 	if bb.hBrush != 0 {
-		win.DeleteObject(win.HGDIOBJ(bb.hBrush))
+		gdi32.DeleteObject(gdi32.HGDIOBJ(bb.hBrush))
 
 		bb.hBrush = 0
 	}
 }
 
-func (bb *brushBase) handle() win.HBRUSH {
+func (bb *brushBase) handle() gdi32.HBRUSH {
 	return bb.hBrush
 }
 
@@ -125,9 +126,9 @@ type nullBrush struct {
 }
 
 func newNullBrush() *nullBrush {
-	lb := &win.LOGBRUSH{LbStyle: win.BS_NULL}
+	lb := &gdi32.LOGBRUSH{LbStyle: gdi32.BS_NULL}
 
-	hBrush := win.CreateBrushIndirect(lb)
+	hBrush := gdi32.CreateBrushIndirect(lb)
 	if hBrush == 0 {
 		panic("failed to create null brush")
 	}
@@ -143,8 +144,8 @@ func (b *nullBrush) Dispose() {
 	b.brushBase.Dispose()
 }
 
-func (*nullBrush) logbrush() *win.LOGBRUSH {
-	return &win.LOGBRUSH{LbStyle: win.BS_NULL}
+func (*nullBrush) logbrush() *gdi32.LOGBRUSH {
+	return &gdi32.LOGBRUSH{LbStyle: gdi32.BS_NULL}
 }
 
 func (*nullBrush) simple() bool {
@@ -173,7 +174,7 @@ func init() {
 }
 
 func NewSystemColorBrush(sysColor SystemColor) (*SystemColorBrush, error) {
-	hBrush := win.GetSysColorBrush(int(sysColor))
+	hBrush := user32.GetSysColorBrush(int(sysColor))
 	if hBrush == 0 {
 		return nil, newError("GetSysColorBrush failed")
 	}
@@ -182,7 +183,7 @@ func NewSystemColorBrush(sysColor SystemColor) (*SystemColorBrush, error) {
 }
 
 func (b *SystemColorBrush) Color() Color {
-	return Color(win.GetSysColor(int(b.sysColor)))
+	return Color(user32.GetSysColor(int(b.sysColor)))
 }
 
 func (b *SystemColorBrush) SystemColor() SystemColor {
@@ -193,10 +194,10 @@ func (*SystemColorBrush) Dispose() {
 	// nop
 }
 
-func (b *SystemColorBrush) logbrush() *win.LOGBRUSH {
-	return &win.LOGBRUSH{
-		LbStyle: win.BS_SOLID,
-		LbColor: win.COLORREF(win.GetSysColor(int(b.sysColor))),
+func (b *SystemColorBrush) logbrush() *gdi32.LOGBRUSH {
+	return &gdi32.LOGBRUSH{
+		LbStyle: gdi32.BS_SOLID,
+		LbColor: gdi32.COLORREF(user32.GetSysColor(int(b.sysColor))),
 	}
 }
 
@@ -210,9 +211,9 @@ type SolidColorBrush struct {
 }
 
 func NewSolidColorBrush(color Color) (*SolidColorBrush, error) {
-	lb := &win.LOGBRUSH{LbStyle: win.BS_SOLID, LbColor: win.COLORREF(color)}
+	lb := &gdi32.LOGBRUSH{LbStyle: gdi32.BS_SOLID, LbColor: gdi32.COLORREF(color)}
 
-	hBrush := win.CreateBrushIndirect(lb)
+	hBrush := gdi32.CreateBrushIndirect(lb)
 	if hBrush == 0 {
 		return nil, newError("CreateBrushIndirect failed")
 	}
@@ -224,8 +225,8 @@ func (b *SolidColorBrush) Color() Color {
 	return b.color
 }
 
-func (b *SolidColorBrush) logbrush() *win.LOGBRUSH {
-	return &win.LOGBRUSH{LbStyle: win.BS_SOLID, LbColor: win.COLORREF(b.color)}
+func (b *SolidColorBrush) logbrush() *gdi32.LOGBRUSH {
+	return &gdi32.LOGBRUSH{LbStyle: gdi32.BS_SOLID, LbColor: gdi32.COLORREF(b.color)}
 }
 
 func (*SolidColorBrush) simple() bool {
@@ -239,9 +240,9 @@ type HatchBrush struct {
 }
 
 func NewHatchBrush(color Color, style HatchStyle) (*HatchBrush, error) {
-	lb := &win.LOGBRUSH{LbStyle: win.BS_HATCHED, LbColor: win.COLORREF(color), LbHatch: uintptr(style)}
+	lb := &gdi32.LOGBRUSH{LbStyle: gdi32.BS_HATCHED, LbColor: gdi32.COLORREF(color), LbHatch: uintptr(style)}
 
-	hBrush := win.CreateBrushIndirect(lb)
+	hBrush := gdi32.CreateBrushIndirect(lb)
 	if hBrush == 0 {
 		return nil, newError("CreateBrushIndirect failed")
 	}
@@ -253,8 +254,8 @@ func (b *HatchBrush) Color() Color {
 	return b.color
 }
 
-func (b *HatchBrush) logbrush() *win.LOGBRUSH {
-	return &win.LOGBRUSH{LbStyle: win.BS_HATCHED, LbColor: win.COLORREF(b.color), LbHatch: uintptr(b.style)}
+func (b *HatchBrush) logbrush() *gdi32.LOGBRUSH {
+	return &gdi32.LOGBRUSH{LbStyle: gdi32.BS_HATCHED, LbColor: gdi32.COLORREF(b.color), LbHatch: uintptr(b.style)}
 }
 
 func (b *HatchBrush) Style() HatchStyle {
@@ -275,7 +276,7 @@ func NewBitmapBrush(bitmap *Bitmap) (*BitmapBrush, error) {
 		return nil, newError("bitmap cannot be nil")
 	}
 
-	hBrush := win.CreatePatternBrush(bitmap.hBmp)
+	hBrush := gdi32.CreatePatternBrush(bitmap.hBmp)
 	if hBrush == 0 {
 		return nil, newError("CreatePatternBrush failed")
 	}
@@ -283,8 +284,8 @@ func NewBitmapBrush(bitmap *Bitmap) (*BitmapBrush, error) {
 	return &BitmapBrush{brushBase: brushBase{hBrush: hBrush}, bitmap: bitmap}, nil
 }
 
-func (b *BitmapBrush) logbrush() *win.LOGBRUSH {
-	return &win.LOGBRUSH{LbStyle: win.BS_DIBPATTERN, LbColor: win.DIB_RGB_COLORS, LbHatch: uintptr(b.bitmap.hPackedDIB)}
+func (b *BitmapBrush) logbrush() *gdi32.LOGBRUSH {
+	return &gdi32.LOGBRUSH{LbStyle: gdi32.BS_DIBPATTERN, LbColor: gdi32.DIB_RGB_COLORS, LbHatch: uintptr(b.bitmap.hPackedDIB)}
 }
 
 func (b *BitmapBrush) Bitmap() *Bitmap {
@@ -402,7 +403,7 @@ func newGradientBrush(vertexes []GradientVertex, triangles []GradientTriangle, o
 	return gb, nil
 }
 
-func (b *GradientBrush) logbrush() *win.LOGBRUSH {
+func (b *GradientBrush) logbrush() *gdi32.LOGBRUSH {
 	if b.mainDelegate == nil {
 		return nil
 	}
@@ -446,7 +447,7 @@ func (b *GradientBrush) create(size Size) (*BitmapBrush, error) {
 		scaleX, scaleY = float64(size.Width), float64(size.Height)
 	}
 
-	vertexes := make([]win.TRIVERTEX, len(b.vertexes))
+	vertexes := make([]gdi32.TRIVERTEX, len(b.vertexes))
 	for i, src := range b.vertexes {
 		dst := &vertexes[i]
 
@@ -457,7 +458,7 @@ func (b *GradientBrush) create(size Size) (*BitmapBrush, error) {
 		dst.Blue = uint16(src.Color.B()) * 256
 	}
 
-	triangles := make([]win.GRADIENT_TRIANGLE, len(b.triangles))
+	triangles := make([]gdi32.GRADIENT_TRIANGLE, len(b.triangles))
 	for i, src := range b.triangles {
 		dst := &triangles[i]
 
@@ -466,7 +467,7 @@ func (b *GradientBrush) create(size Size) (*BitmapBrush, error) {
 		dst.Vertex3 = uint32(src.Vertex3)
 	}
 
-	if !win.GradientFill(canvas.hdc, &vertexes[0], uint32(len(vertexes)), unsafe.Pointer(&triangles[0]), uint32(len(triangles)), win.GRADIENT_FILL_TRIANGLE) {
+	if !gdi32.GradientFill(canvas.hdc, &vertexes[0], uint32(len(vertexes)), unsafe.Pointer(&triangles[0]), uint32(len(triangles)), gdi32.GRADIENT_FILL_TRIANGLE) {
 		return nil, newError("GradientFill failed")
 	}
 

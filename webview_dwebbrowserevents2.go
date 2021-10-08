@@ -4,45 +4,45 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
-	"unsafe"
-)
-
-import (
 	"time"
+	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/ole32"
+	"github.com/Gipcomp/win32/oleaut32"
+	"github.com/Gipcomp/win32/shdocvw"
+	"github.com/Gipcomp/win32/win"
 )
 
-var webViewDWebBrowserEvents2Vtbl *win.DWebBrowserEvents2Vtbl
+var webViewDWebBrowserEvents2Vtbl *shdocvw.DWebBrowserEvents2Vtbl
 
 func init() {
 	AppendToWalkInit(func() {
-		webViewDWebBrowserEvents2Vtbl = &win.DWebBrowserEvents2Vtbl{
-			syscall.NewCallback(webView_DWebBrowserEvents2_QueryInterface),
-			syscall.NewCallback(webView_DWebBrowserEvents2_AddRef),
-			syscall.NewCallback(webView_DWebBrowserEvents2_Release),
-			syscall.NewCallback(webView_DWebBrowserEvents2_GetTypeInfoCount),
-			syscall.NewCallback(webView_DWebBrowserEvents2_GetTypeInfo),
-			syscall.NewCallback(webView_DWebBrowserEvents2_GetIDsOfNames),
-			syscall.NewCallback(webView_DWebBrowserEvents2_Invoke),
+		webViewDWebBrowserEvents2Vtbl = &shdocvw.DWebBrowserEvents2Vtbl{
+			QueryInterface:   syscall.NewCallback(webView_DWebBrowserEvents2_QueryInterface),
+			AddRef:           syscall.NewCallback(webView_DWebBrowserEvents2_AddRef),
+			Release:          syscall.NewCallback(webView_DWebBrowserEvents2_Release),
+			GetTypeInfoCount: syscall.NewCallback(webView_DWebBrowserEvents2_GetTypeInfoCount),
+			GetTypeInfo:      syscall.NewCallback(webView_DWebBrowserEvents2_GetTypeInfo),
+			GetIDsOfNames:    syscall.NewCallback(webView_DWebBrowserEvents2_GetIDsOfNames),
+			Invoke:           syscall.NewCallback(webView_DWebBrowserEvents2_Invoke),
 		}
 	})
 }
 
 type webViewDWebBrowserEvents2 struct {
-	win.DWebBrowserEvents2
+	shdocvw.DWebBrowserEvents2
 }
 
-func webView_DWebBrowserEvents2_QueryInterface(wbe2 *webViewDWebBrowserEvents2, riid win.REFIID, ppvObject *unsafe.Pointer) uintptr {
+func webView_DWebBrowserEvents2_QueryInterface(wbe2 *webViewDWebBrowserEvents2, riid ole32.REFIID, ppvObject *unsafe.Pointer) uintptr {
 	// Just reuse the QueryInterface implementation we have for IOleClientSite.
 	// We need to adjust object, which initially points at our
 	// webViewDWebBrowserEvents2, so it refers to the containing
 	// webViewIOleClientSite for the call.
-	var clientSite win.IOleClientSite
+	var clientSite ole32.IOleClientSite
 	var webViewInPlaceSite webViewIOleInPlaceSite
 	var docHostUIHandler webViewIDocHostUIHandler
 
@@ -103,12 +103,12 @@ func webView_DWebBrowserEvents2_GetIDsOfNames(args *uintptr) uintptr {
 /*
 func webView_DWebBrowserEvents2_Invoke(
 	wbe2 *webViewDWebBrowserEvents2,
-	dispIdMember win.DISPID,
-	riid win.REFIID,
+	dispIdMember oleaut32.DISPID,
+	riid ole32.REFIID,
 	lcid uint32, // LCID
 	wFlags uint16,
-	pDispParams *win.DISPPARAMS,
-	pVarResult *win.VARIANT,
+	pDispParams *oleaut32.DISPPARAMS,
+	pVarResult *oleaut32.VARIANT,
 	pExcepInfo unsafe.Pointer, // *EXCEPINFO
 	puArgErr *uint32) uintptr {
 */
@@ -124,12 +124,12 @@ func webView_DWebBrowserEvents2_Invoke(
 	arg8 uintptr) uintptr {
 
 	wbe2 := (*webViewDWebBrowserEvents2)(unsafe.Pointer(arg0))
-	dispIdMember := *(*win.DISPID)(unsafe.Pointer(&arg1))
-	//riid := *(*win.REFIID)(unsafe.Pointer(&arg2))
+	dispIdMember := *(*oleaut32.DISPID)(unsafe.Pointer(&arg1))
+	//riid := *(*ole32.REFIID)(unsafe.Pointer(&arg2))
 	//lcid := *(*uint32)(unsafe.Pointer(&arg3))
 	//wFlags := *(*uint16)(unsafe.Pointer(&arg4))
-	pDispParams := (*win.DISPPARAMS)(unsafe.Pointer(arg5))
-	//pVarResult := (*win.VARIANT)(unsafe.Pointer(arg6))
+	pDispParams := (*oleaut32.DISPPARAMS)(unsafe.Pointer(arg5))
+	//pVarResult := (*oleaut32.VARIANT)(unsafe.Pointer(arg6))
 	//pExcepInfo := unsafe.Pointer(arg7)
 	//puArgErr := (*uint32)(unsafe.Pointer(arg8))
 
@@ -142,8 +142,8 @@ func webView_DWebBrowserEvents2_Invoke(
 		uintptr(unsafe.Sizeof(wb))))
 
 	switch dispIdMember {
-	case win.DISPID_BEFORENAVIGATE2:
-		rgvargPtr := (*[7]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_BEFORENAVIGATE2:
+		rgvargPtr := (*[7]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		eventData := &WebViewNavigatingEventData{
 			pDisp:           (*rgvargPtr)[6].MustPDispatch(),
 			url:             (*rgvargPtr)[5].MustPVariant(),
@@ -155,29 +155,29 @@ func webView_DWebBrowserEvents2_Invoke(
 		}
 		wv.navigatingPublisher.Publish(eventData)
 
-	case win.DISPID_NAVIGATECOMPLETE2:
-		rgvargPtr := (*[2]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_NAVIGATECOMPLETE2:
+		rgvargPtr := (*[2]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		url := (*rgvargPtr)[0].MustPVariant()
 		urlStr := ""
 		if url != nil && url.MustBSTR() != nil {
-			urlStr = win.BSTRToString(url.MustBSTR())
+			urlStr = oleaut32.BSTRToString(url.MustBSTR())
 		}
 		wv.navigatedPublisher.Publish(urlStr)
 
 		wv.urlChangedPublisher.Publish()
 
-	case win.DISPID_DOWNLOADBEGIN:
+	case oleaut32.DISPID_DOWNLOADBEGIN:
 		wv.downloadingPublisher.Publish()
 
-	case win.DISPID_DOWNLOADCOMPLETE:
+	case oleaut32.DISPID_DOWNLOADCOMPLETE:
 		wv.downloadedPublisher.Publish()
 
-	case win.DISPID_DOCUMENTCOMPLETE:
-		rgvargPtr := (*[2]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_DOCUMENTCOMPLETE:
+		rgvargPtr := (*[2]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		url := (*rgvargPtr)[0].MustPVariant()
 		urlStr := ""
 		if url != nil && url.MustBSTR() != nil {
-			urlStr = win.BSTRToString(url.MustBSTR())
+			urlStr = oleaut32.BSTRToString(url.MustBSTR())
 		}
 
 		// FIXME: Horrible hack to avoid glitch where the document is not displayed.
@@ -193,8 +193,8 @@ func webView_DWebBrowserEvents2_Invoke(
 
 		wv.documentCompletedPublisher.Publish(urlStr)
 
-	case win.DISPID_NAVIGATEERROR:
-		rgvargPtr := (*[5]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_NAVIGATEERROR:
+		rgvargPtr := (*[5]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		eventData := &WebViewNavigatedErrorEventData{
 			pDisp:           (*rgvargPtr)[4].MustPDispatch(),
 			url:             (*rgvargPtr)[3].MustPVariant(),
@@ -204,8 +204,8 @@ func webView_DWebBrowserEvents2_Invoke(
 		}
 		wv.navigatedErrorPublisher.Publish(eventData)
 
-	case win.DISPID_NEWWINDOW3:
-		rgvargPtr := (*[5]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_NEWWINDOW3:
+		rgvargPtr := (*[5]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		eventData := &WebViewNewWindowEventData{
 			ppDisp:         (*rgvargPtr)[4].MustPPDispatch(),
 			cancel:         (*rgvargPtr)[3].MustPBool(),
@@ -215,102 +215,102 @@ func webView_DWebBrowserEvents2_Invoke(
 		}
 		wv.newWindowPublisher.Publish(eventData)
 
-	case win.DISPID_ONQUIT:
+	case oleaut32.DISPID_ONQUIT:
 		wv.quittingPublisher.Publish()
 
-	case win.DISPID_WINDOWCLOSING:
-		rgvargPtr := (*[2]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_WINDOWCLOSING:
+		rgvargPtr := (*[2]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		eventData := &WebViewWindowClosingEventData{
 			bIsChildWindow: (*rgvargPtr)[1].MustBool(),
 			cancel:         (*rgvargPtr)[0].MustPBool(),
 		}
 		wv.windowClosingPublisher.Publish(eventData)
 
-	case win.DISPID_ONSTATUSBAR:
-		rgvargPtr := (*[1]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_ONSTATUSBAR:
+		rgvargPtr := (*[1]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		statusBar := (*rgvargPtr)[0].MustBool()
-		if statusBar != win.VARIANT_FALSE {
+		if statusBar != oleaut32.VARIANT_FALSE {
 			wv.statusBarVisible = true
 		} else {
 			wv.statusBarVisible = false
 		}
 		wv.statusBarVisibleChangedPublisher.Publish()
 
-	case win.DISPID_ONTHEATERMODE:
-		rgvargPtr := (*[1]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_ONTHEATERMODE:
+		rgvargPtr := (*[1]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		theaterMode := (*rgvargPtr)[0].MustBool()
-		if theaterMode != win.VARIANT_FALSE {
+		if theaterMode != oleaut32.VARIANT_FALSE {
 			wv.isTheaterMode = true
 		} else {
 			wv.isTheaterMode = false
 		}
 		wv.theaterModeChangedPublisher.Publish()
 
-	case win.DISPID_ONTOOLBAR:
-		rgvargPtr := (*[1]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_ONTOOLBAR:
+		rgvargPtr := (*[1]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		toolBar := (*rgvargPtr)[0].MustBool()
-		if toolBar != win.VARIANT_FALSE {
+		if toolBar != oleaut32.VARIANT_FALSE {
 			wv.toolBarVisible = true
 		} else {
 			wv.toolBarVisible = false
 		}
 		wv.toolBarVisibleChangedPublisher.Publish()
 
-	case win.DISPID_ONVISIBLE:
-		rgvargPtr := (*[1]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_ONVISIBLE:
+		rgvargPtr := (*[1]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		vVisible := (*rgvargPtr)[0].MustBool()
-		if vVisible != win.VARIANT_FALSE {
+		if vVisible != oleaut32.VARIANT_FALSE {
 			wv.browserVisible = true
 		} else {
 			wv.browserVisible = false
 		}
 		wv.browserVisibleChangedPublisher.Publish()
 
-	case win.DISPID_COMMANDSTATECHANGE:
-		rgvargPtr := (*[2]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_COMMANDSTATECHANGE:
+		rgvargPtr := (*[2]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		command := (*rgvargPtr)[1].MustLong()
 		enable := (*rgvargPtr)[0].MustBool()
-		enableBool := (enable != win.VARIANT_FALSE)
+		enableBool := (enable != oleaut32.VARIANT_FALSE)
 		switch command {
-		case win.CSC_UPDATECOMMANDS:
+		case oleaut32.CSC_UPDATECOMMANDS:
 			wv.toolBarEnabled = enableBool
 			wv.toolBarEnabledChangedPublisher.Publish()
 
-		case win.CSC_NAVIGATEFORWARD:
+		case oleaut32.CSC_NAVIGATEFORWARD:
 			wv.canGoForward = enableBool
 			wv.canGoForwardChangedPublisher.Publish()
 
-		case win.CSC_NAVIGATEBACK:
+		case oleaut32.CSC_NAVIGATEBACK:
 			wv.canGoBack = enableBool
 			wv.canGoBackChangedPublisher.Publish()
 		}
 
-	case win.DISPID_PROGRESSCHANGE:
-		rgvargPtr := (*[2]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_PROGRESSCHANGE:
+		rgvargPtr := (*[2]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		wv.progressValue = (*rgvargPtr)[1].MustLong()
 		wv.progressMax = (*rgvargPtr)[0].MustLong()
 		wv.progressChangedPublisher.Publish()
 
-	case win.DISPID_STATUSTEXTCHANGE:
-		rgvargPtr := (*[1]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_STATUSTEXTCHANGE:
+		rgvargPtr := (*[1]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		sText := (*rgvargPtr)[0].MustBSTR()
 		if sText != nil {
-			wv.statusText = win.BSTRToString(sText)
+			wv.statusText = oleaut32.BSTRToString(sText)
 		} else {
 			wv.statusText = ""
 		}
 		wv.statusTextChangedPublisher.Publish()
 
-	case win.DISPID_TITLECHANGE:
-		rgvargPtr := (*[1]win.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
+	case oleaut32.DISPID_TITLECHANGE:
+		rgvargPtr := (*[1]oleaut32.VARIANTARG)(unsafe.Pointer(pDispParams.Rgvarg))
 		sText := (*rgvargPtr)[0].MustBSTR()
 		if sText != nil {
-			wv.documentTitle = win.BSTRToString(sText)
+			wv.documentTitle = oleaut32.BSTRToString(sText)
 		} else {
 			wv.documentTitle = ""
 		}
 		wv.documentTitleChangedPublisher.Publish()
 	}
 
-	return win.DISP_E_MEMBERNOTFOUND
+	return oleaut32.DISP_E_MEMBERNOTFOUND
 }

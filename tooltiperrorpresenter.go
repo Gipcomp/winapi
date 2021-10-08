@@ -4,11 +4,9 @@
 
 // +build windows
 
-package walk
+package winapi
 
-import (
-	"github.com/lxn/win"
-)
+import "github.com/Gipcomp/win32/commctrl"
 
 var ValidationErrorEffect WidgetGraphicsEffect
 
@@ -23,7 +21,7 @@ type ToolTipErrorPresenter struct {
 }
 
 func NewToolTipErrorPresenter() (*ToolTipErrorPresenter, error) {
-	tt, err := newToolTip(win.TTS_BALLOON)
+	tt, err := newToolTip(commctrl.TTS_BALLOON)
 	if err != nil {
 		return nil, err
 	}

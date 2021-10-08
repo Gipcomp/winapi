@@ -4,14 +4,18 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"sync"
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/win32/winuser"
 )
 
 type TextEdit struct {
@@ -36,12 +40,12 @@ func NewTextEditWithStyle(parent Container, style uint32) (*TextEdit, error) {
 		te,
 		parent,
 		"EDIT",
-		win.WS_TABSTOP|win.WS_VISIBLE|win.ES_MULTILINE|win.ES_WANTRETURN|style,
-		win.WS_EX_CLIENTEDGE); err != nil {
+		user32.WS_TABSTOP|user32.WS_VISIBLE|winuser.ES_MULTILINE|winuser.ES_WANTRETURN|style,
+		user32.WS_EX_CLIENTEDGE); err != nil {
 		return nil, err
 	}
 
-	te.origWordbreakProcPtr = te.SendMessage(win.EM_GETWORDBREAKPROC, 0, 0)
+	te.origWordbreakProcPtr = te.SendMessage(winuser.EM_GETWORDBREAKPROC, 0, 0)
 
 	te.GraphicsEffects().Add(InteractionEffect)
 	te.GraphicsEffects().Add(FocusEffect)
@@ -77,10 +81,10 @@ func (te *TextEdit) updateMargins() {
 	// 56 works at least from 96 to 192 DPI, so until a better solution comes up, this is it.
 	defaultSize := te.dialogBaseUnitsToPixels(Size{56, 12})
 
-	var rc win.RECT
-	te.SendMessage(win.EM_GETRECT, 0, uintptr(unsafe.Pointer(&rc)))
+	var rc gdi32.RECT
+	te.SendMessage(winuser.EM_GETRECT, 0, uintptr(unsafe.Pointer(&rc)))
 
-	if te.hasExtendedStyleBits(win.WS_EX_CLIENTEDGE) {
+	if te.hasExtendedStyleBits(user32.WS_EX_CLIENTEDGE) {
 		width := te.WidthPixels()
 		if width == 0 {
 			width = defaultSize.Width
@@ -104,21 +108,21 @@ func init() {
 
 func drawTextCompatibleEditWordbreakProc(lpch *uint16, ichCurrent, cch, code uintptr) uintptr {
 	switch code {
-	case win.WB_LEFT:
+	case user32.WB_LEFT:
 		for i := int(ichCurrent); i >= 0; i-- {
 			if *(*uint16)(unsafe.Pointer(uintptr(unsafe.Pointer(lpch)) + uintptr(i)*2)) == 32 {
 				return uintptr(i)
 			}
 		}
 
-	case win.WB_RIGHT:
+	case user32.WB_RIGHT:
 		for i := int(ichCurrent); i < int(cch); i++ {
 			if *(*uint16)(unsafe.Pointer(uintptr(unsafe.Pointer(lpch)) + uintptr(i)*2)) == 32 {
 				return uintptr(i)
 			}
 		}
 
-	case win.WB_ISDELIMITER:
+	case user32.WB_ISDELIMITER:
 		if *(*uint16)(unsafe.Pointer(uintptr(unsafe.Pointer(lpch)) + ichCurrent*2)) == 32 {
 			return 1
 		}
@@ -132,7 +136,7 @@ func (te *TextEdit) Text() string {
 }
 
 func (te *TextEdit) TextLength() int {
-	return int(te.SendMessage(win.WM_GETTEXTLENGTH, 0, 0))
+	return int(te.SendMessage(user32.WM_GETTEXTLENGTH, 0, 0))
 }
 
 func (te *TextEdit) SetText(text string) (err error) {
@@ -142,11 +146,11 @@ func (te *TextEdit) SetText(text string) (err error) {
 
 	var oldLineCount int
 	if te.compactHeight {
-		oldLineCount = int(te.SendMessage(win.EM_GETLINECOUNT, 0, 0))
+		oldLineCount = int(te.SendMessage(winuser.EM_GETLINECOUNT, 0, 0))
 	}
 	err = te.setText(text)
 	if te.compactHeight {
-		if newLineCount := int(te.SendMessage(win.EM_GETLINECOUNT, 0, 0)); newLineCount != oldLineCount {
+		if newLineCount := int(te.SendMessage(winuser.EM_GETLINECOUNT, 0, 0)); newLineCount != oldLineCount {
 			te.RequestLayout()
 		}
 	}
@@ -172,17 +176,17 @@ func (te *TextEdit) SetCompactHeight(enabled bool) {
 	} else {
 		ptr = te.origWordbreakProcPtr
 	}
-	te.SendMessage(win.EM_SETWORDBREAKPROC, 0, ptr)
+	te.SendMessage(winuser.EM_SETWORDBREAKPROC, 0, ptr)
 
 	te.RequestLayout()
 }
 
 func (te *TextEdit) TextAlignment() Alignment1D {
-	switch win.GetWindowLong(te.hWnd, win.GWL_STYLE) & (win.ES_LEFT | win.ES_CENTER | win.ES_RIGHT) {
-	case win.ES_CENTER:
+	switch user32.GetWindowLong(te.hWnd, user32.GWL_STYLE) & (winuser.ES_LEFT | winuser.ES_CENTER | winuser.ES_RIGHT) {
+	case winuser.ES_CENTER:
 		return AlignCenter
 
-	case win.ES_RIGHT:
+	case winuser.ES_RIGHT:
 		return AlignFar
 	}
 
@@ -198,41 +202,41 @@ func (te *TextEdit) SetTextAlignment(alignment Alignment1D) error {
 
 	switch alignment {
 	case AlignCenter:
-		bit = win.ES_CENTER
+		bit = winuser.ES_CENTER
 
 	case AlignFar:
-		bit = win.ES_RIGHT
+		bit = winuser.ES_RIGHT
 
 	default:
-		bit = win.ES_LEFT
+		bit = winuser.ES_LEFT
 	}
 
-	return te.setAndClearStyleBits(bit, win.ES_LEFT|win.ES_CENTER|win.ES_RIGHT)
+	return te.setAndClearStyleBits(bit, winuser.ES_LEFT|winuser.ES_CENTER|winuser.ES_RIGHT)
 }
 
 func (te *TextEdit) MaxLength() int {
-	return int(te.SendMessage(win.EM_GETLIMITTEXT, 0, 0))
+	return int(te.SendMessage(winuser.EM_GETLIMITTEXT, 0, 0))
 }
 
 func (te *TextEdit) SetMaxLength(value int) {
-	te.SendMessage(win.EM_SETLIMITTEXT, uintptr(value), 0)
+	te.SendMessage(winuser.EM_SETLIMITTEXT, uintptr(value), 0)
 }
 
 func (te *TextEdit) ScrollToCaret() {
-	te.SendMessage(win.EM_SCROLLCARET, 0, 0)
+	te.SendMessage(winuser.EM_SCROLLCARET, 0, 0)
 }
 
 func (te *TextEdit) TextSelection() (start, end int) {
-	te.SendMessage(win.EM_GETSEL, uintptr(unsafe.Pointer(&start)), uintptr(unsafe.Pointer(&end)))
+	te.SendMessage(winuser.EM_GETSEL, uintptr(unsafe.Pointer(&start)), uintptr(unsafe.Pointer(&end)))
 	return
 }
 
 func (te *TextEdit) SetTextSelection(start, end int) {
-	te.SendMessage(win.EM_SETSEL, uintptr(start), uintptr(end))
+	te.SendMessage(winuser.EM_SETSEL, uintptr(start), uintptr(end))
 }
 
 func (te *TextEdit) ReplaceSelectedText(text string, canUndo bool) {
-	te.SendMessage(win.EM_REPLACESEL,
+	te.SendMessage(winuser.EM_REPLACESEL,
 		uintptr(win.BoolToBOOL(canUndo)),
 		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(text))))
 }
@@ -246,11 +250,11 @@ func (te *TextEdit) AppendText(value string) {
 }
 
 func (te *TextEdit) ReadOnly() bool {
-	return te.hasStyleBits(win.ES_READONLY)
+	return te.hasStyleBits(winuser.ES_READONLY)
 }
 
 func (te *TextEdit) SetReadOnly(readOnly bool) error {
-	if 0 == te.SendMessage(win.EM_SETREADONLY, uintptr(win.BoolToBOOL(readOnly)), 0) {
+	if te.SendMessage(winuser.EM_SETREADONLY, uintptr(win.BoolToBOOL(readOnly)), 0) == 0 {
 		return newError("SendMessage(EM_SETREADONLY)")
 	}
 
@@ -275,13 +279,13 @@ func (te *TextEdit) SetTextColor(c Color) {
 
 // ContextMenuLocation returns carret position in screen coordinates in native pixels.
 func (te *TextEdit) ContextMenuLocation() Point {
-	idx := int(te.SendMessage(win.EM_GETCARETINDEX, 0, 0))
+	idx := int(te.SendMessage(winuser.EM_GETCARETINDEX, 0, 0))
 	if idx < 0 {
 		start, end := te.TextSelection()
 		idx = (start + end) / 2
 	}
-	res := uint32(te.SendMessage(win.EM_POSFROMCHAR, uintptr(idx), 0))
-	pt := win.POINT{int32(win.LOWORD(res)), int32(win.HIWORD(res))}
+	res := uint32(te.SendMessage(winuser.EM_POSFROMCHAR, uintptr(idx), 0))
+	pt := gdi32.POINT{X: int32(win.LOWORD(res)), Y: int32(win.HIWORD(res))}
 	windowTrimToClientBounds(te.hWnd, &pt)
 	return pointPixelsFromPOINT(pt)
 }
@@ -290,11 +294,11 @@ func (*TextEdit) NeedsWmSize() bool {
 	return true
 }
 
-func (te *TextEdit) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (te *TextEdit) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_COMMAND:
+	case user32.WM_COMMAND:
 		switch win.HIWORD(uint32(wParam)) {
-		case win.EN_CHANGE:
+		case winuser.EN_CHANGE:
 			if te.compactHeight {
 				if createLayoutItemForWidget(te).(MinSizer).MinSize().Height != te.HeightPixels() {
 					te.RequestLayout()
@@ -303,14 +307,14 @@ func (te *TextEdit) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) u
 			te.textChangedPublisher.Publish()
 		}
 
-	case win.WM_GETDLGCODE:
-		if wParam == win.VK_RETURN {
-			return win.DLGC_WANTALLKEYS
+	case user32.WM_GETDLGCODE:
+		if wParam == user32.VK_RETURN {
+			return user32.DLGC_WANTALLKEYS
 		}
 
-		return win.DLGC_HASSETSEL | win.DLGC_WANTARROWS | win.DLGC_WANTCHARS
+		return user32.DLGC_HASSETSEL | user32.DLGC_WANTARROWS | user32.DLGC_WANTCHARS
 
-	case win.WM_KEYDOWN:
+	case user32.WM_KEYDOWN:
 		if Key(wParam) == KeyA && ControlDown() {
 			te.SetTextSelection(0, -1)
 		}

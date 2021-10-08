@@ -4,10 +4,11 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/uxtheme"
 )
 
 const tabPageWindowClass = `\o/ Walk_TabPage_Class \o/`
@@ -18,7 +19,7 @@ func init() {
 	AppendToWalkInit(func() {
 		MustRegisterWindowClass(tabPageWindowClass)
 
-		tabPageBackgroundBrush, _ = NewSystemColorBrush(win.COLOR_WINDOW)
+		tabPageBackgroundBrush, _ = NewSystemColorBrush(user32.COLOR_WINDOW)
 	})
 }
 
@@ -38,8 +39,8 @@ func NewTabPage() (*TabPage, error) {
 		tp,
 		nil,
 		tabPageWindowClass,
-		win.WS_POPUP,
-		win.WS_EX_CONTROLPARENT); err != nil {
+		user32.WS_POPUP,
+		user32.WS_EX_CONTROLPARENT); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +87,7 @@ func (tp *TabPage) Background() Brush {
 		return nullBrushSingleton
 	}
 
-	if win.IsAppThemed() {
+	if uxtheme.IsAppThemed() {
 		return tabPageBackgroundBrush
 	}
 

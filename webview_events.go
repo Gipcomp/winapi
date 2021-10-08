@@ -4,30 +4,28 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"unsafe"
-)
 
-import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/oleaut32"
 )
 
 type WebViewNavigatingEventData struct {
-	pDisp           *win.IDispatch
-	url             *win.VARIANT
-	flags           *win.VARIANT
-	targetFrameName *win.VARIANT
-	postData        *win.VARIANT
-	headers         *win.VARIANT
-	cancel          *win.VARIANT_BOOL
+	pDisp           *oleaut32.IDispatch
+	url             *oleaut32.VARIANT
+	flags           *oleaut32.VARIANT
+	targetFrameName *oleaut32.VARIANT
+	postData        *oleaut32.VARIANT
+	headers         *oleaut32.VARIANT
+	cancel          *oleaut32.VARIANT_BOOL
 }
 
 func (eventData *WebViewNavigatingEventData) Url() string {
 	url := eventData.url
 	if url != nil && url.MustBSTR() != nil {
-		return win.BSTRToString(url.MustBSTR())
+		return oleaut32.BSTRToString(url.MustBSTR())
 	}
 	return ""
 }
@@ -44,7 +42,7 @@ func (eventData *WebViewNavigatingEventData) PostData() string {
 	postData := eventData.postData
 	if postData != nil {
 		pvar := postData.MustPVariant()
-		if pvar != nil && pvar.Vt == win.VT_ARRAY|win.VT_UI1 {
+		if pvar != nil && pvar.Vt == oleaut32.VT_ARRAY|oleaut32.VT_UI1 {
 			psa := pvar.MustPSafeArray()
 			if psa != nil && psa.CDims == 1 && psa.CbElements == 1 {
 				postDataSize := psa.Rgsabound[0].CElements * psa.CbElements
@@ -60,7 +58,7 @@ func (eventData *WebViewNavigatingEventData) PostData() string {
 func (eventData *WebViewNavigatingEventData) Headers() string {
 	headers := eventData.headers
 	if headers != nil && headers.MustBSTR() != nil {
-		return win.BSTRToString(headers.MustBSTR())
+		return oleaut32.BSTRToString(headers.MustBSTR())
 	}
 	return ""
 }
@@ -68,7 +66,7 @@ func (eventData *WebViewNavigatingEventData) Headers() string {
 func (eventData *WebViewNavigatingEventData) TargetFrameName() string {
 	targetFrameName := eventData.targetFrameName
 	if targetFrameName != nil && targetFrameName.MustBSTR() != nil {
-		return win.BSTRToString(targetFrameName.MustBSTR())
+		return oleaut32.BSTRToString(targetFrameName.MustBSTR())
 	}
 	return ""
 }
@@ -76,7 +74,7 @@ func (eventData *WebViewNavigatingEventData) TargetFrameName() string {
 func (eventData *WebViewNavigatingEventData) Canceled() bool {
 	cancel := eventData.cancel
 	if cancel != nil {
-		if *cancel != win.VARIANT_FALSE {
+		if *cancel != oleaut32.VARIANT_FALSE {
 			return true
 		} else {
 			return false
@@ -89,9 +87,9 @@ func (eventData *WebViewNavigatingEventData) SetCanceled(value bool) {
 	cancel := eventData.cancel
 	if cancel != nil {
 		if value {
-			*cancel = win.VARIANT_TRUE
+			*cancel = oleaut32.VARIANT_TRUE
 		} else {
-			*cancel = win.VARIANT_FALSE
+			*cancel = oleaut32.VARIANT_FALSE
 		}
 	}
 }
@@ -135,17 +133,17 @@ func (p *WebViewNavigatingEventPublisher) Publish(eventData *WebViewNavigatingEv
 }
 
 type WebViewNavigatedErrorEventData struct {
-	pDisp           *win.IDispatch
-	url             *win.VARIANT
-	targetFrameName *win.VARIANT
-	statusCode      *win.VARIANT
-	cancel          *win.VARIANT_BOOL
+	pDisp           *oleaut32.IDispatch
+	url             *oleaut32.VARIANT
+	targetFrameName *oleaut32.VARIANT
+	statusCode      *oleaut32.VARIANT
+	cancel          *oleaut32.VARIANT_BOOL
 }
 
 func (eventData *WebViewNavigatedErrorEventData) Url() string {
 	url := eventData.url
 	if url != nil && url.MustBSTR() != nil {
-		return win.BSTRToString(url.MustBSTR())
+		return oleaut32.BSTRToString(url.MustBSTR())
 	}
 	return ""
 }
@@ -153,7 +151,7 @@ func (eventData *WebViewNavigatedErrorEventData) Url() string {
 func (eventData *WebViewNavigatedErrorEventData) TargetFrameName() string {
 	targetFrameName := eventData.targetFrameName
 	if targetFrameName != nil && targetFrameName.MustBSTR() != nil {
-		return win.BSTRToString(targetFrameName.MustBSTR())
+		return oleaut32.BSTRToString(targetFrameName.MustBSTR())
 	}
 	return ""
 }
@@ -169,7 +167,7 @@ func (eventData *WebViewNavigatedErrorEventData) StatusCode() int32 {
 func (eventData *WebViewNavigatedErrorEventData) Canceled() bool {
 	cancel := eventData.cancel
 	if cancel != nil {
-		if *cancel != win.VARIANT_FALSE {
+		if *cancel != oleaut32.VARIANT_FALSE {
 			return true
 		} else {
 			return false
@@ -182,9 +180,9 @@ func (eventData *WebViewNavigatedErrorEventData) SetCanceled(value bool) {
 	cancel := eventData.cancel
 	if cancel != nil {
 		if value {
-			*cancel = win.VARIANT_TRUE
+			*cancel = oleaut32.VARIANT_TRUE
 		} else {
-			*cancel = win.VARIANT_FALSE
+			*cancel = oleaut32.VARIANT_FALSE
 		}
 	}
 }
@@ -228,8 +226,8 @@ func (p *WebViewNavigatedErrorEventPublisher) Publish(eventData *WebViewNavigate
 }
 
 type WebViewNewWindowEventData struct {
-	ppDisp         **win.IDispatch
-	cancel         *win.VARIANT_BOOL
+	ppDisp         **oleaut32.IDispatch
+	cancel         *oleaut32.VARIANT_BOOL
 	dwFlags        uint32
 	bstrUrlContext *uint16
 	bstrUrl        *uint16
@@ -238,7 +236,7 @@ type WebViewNewWindowEventData struct {
 func (eventData *WebViewNewWindowEventData) Canceled() bool {
 	cancel := eventData.cancel
 	if cancel != nil {
-		if *cancel != win.VARIANT_FALSE {
+		if *cancel != oleaut32.VARIANT_FALSE {
 			return true
 		} else {
 			return false
@@ -251,9 +249,9 @@ func (eventData *WebViewNewWindowEventData) SetCanceled(value bool) {
 	cancel := eventData.cancel
 	if cancel != nil {
 		if value {
-			*cancel = win.VARIANT_TRUE
+			*cancel = oleaut32.VARIANT_TRUE
 		} else {
-			*cancel = win.VARIANT_FALSE
+			*cancel = oleaut32.VARIANT_FALSE
 		}
 	}
 }
@@ -265,7 +263,7 @@ func (eventData *WebViewNewWindowEventData) Flags() uint32 {
 func (eventData *WebViewNewWindowEventData) UrlContext() string {
 	bstrUrlContext := eventData.bstrUrlContext
 	if bstrUrlContext != nil {
-		return win.BSTRToString(bstrUrlContext)
+		return oleaut32.BSTRToString(bstrUrlContext)
 	}
 	return ""
 }
@@ -273,7 +271,7 @@ func (eventData *WebViewNewWindowEventData) UrlContext() string {
 func (eventData *WebViewNewWindowEventData) Url() string {
 	bstrUrl := eventData.bstrUrl
 	if bstrUrl != nil {
-		return win.BSTRToString(bstrUrl)
+		return oleaut32.BSTRToString(bstrUrl)
 	}
 	return ""
 }
@@ -317,13 +315,13 @@ func (p *WebViewNewWindowEventPublisher) Publish(eventData *WebViewNewWindowEven
 }
 
 type WebViewWindowClosingEventData struct {
-	bIsChildWindow win.VARIANT_BOOL
-	cancel         *win.VARIANT_BOOL
+	bIsChildWindow oleaut32.VARIANT_BOOL
+	cancel         *oleaut32.VARIANT_BOOL
 }
 
 func (eventData *WebViewWindowClosingEventData) IsChildWindow() bool {
 	bIsChildWindow := eventData.bIsChildWindow
-	if bIsChildWindow != win.VARIANT_FALSE {
+	if bIsChildWindow != oleaut32.VARIANT_FALSE {
 		return true
 	} else {
 		return false
@@ -334,7 +332,7 @@ func (eventData *WebViewWindowClosingEventData) IsChildWindow() bool {
 func (eventData *WebViewWindowClosingEventData) Canceled() bool {
 	cancel := eventData.cancel
 	if cancel != nil {
-		if *cancel != win.VARIANT_FALSE {
+		if *cancel != oleaut32.VARIANT_FALSE {
 			return true
 		} else {
 			return false
@@ -347,9 +345,9 @@ func (eventData *WebViewWindowClosingEventData) SetCanceled(value bool) {
 	cancel := eventData.cancel
 	if cancel != nil {
 		if value {
-			*cancel = win.VARIANT_TRUE
+			*cancel = oleaut32.VARIANT_TRUE
 		} else {
-			*cancel = win.VARIANT_FALSE
+			*cancel = oleaut32.VARIANT_FALSE
 		}
 	}
 }

@@ -4,11 +4,9 @@
 
 // +build windows
 
-package walk
+package winapi
 
-import (
-	"github.com/lxn/win"
-)
+import "github.com/Gipcomp/win32/handle"
 
 type tabPageListObserver interface {
 	onInsertingPage(index int, page *TabPage) error
@@ -71,7 +69,7 @@ func (l *TabPageList) Contains(item *TabPage) bool {
 	return l.Index(item) > -1
 }
 
-func (l *TabPageList) indexHandle(handle win.HWND) int {
+func (l *TabPageList) indexHandle(handle handle.HWND) int {
 	for i, page := range l.items {
 		if page.Handle() == handle {
 			return i
@@ -81,7 +79,7 @@ func (l *TabPageList) indexHandle(handle win.HWND) int {
 	return -1
 }
 
-func (l *TabPageList) containsHandle(handle win.HWND) bool {
+func (l *TabPageList) containsHandle(handle handle.HWND) bool {
 	return l.indexHandle(handle) > -1
 }
 

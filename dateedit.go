@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"strings"
@@ -12,7 +12,10 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/user32"
 )
 
 type DateEdit struct {
@@ -28,12 +31,12 @@ func newDateEdit(parent Container, style uint32) (*DateEdit, error) {
 		de,
 		parent,
 		"SysDateTimePick32",
-		win.WS_TABSTOP|win.WS_VISIBLE|win.DTS_SHORTDATEFORMAT|style,
+		user32.WS_TABSTOP|user32.WS_VISIBLE|commctrl.DTS_SHORTDATEFORMAT|style,
 		0); err != nil {
 		return nil, err
 	}
 
-	if style&win.DTS_SHOWNONE != 0 {
+	if style&commctrl.DTS_SHOWNONE != 0 {
 		de.setSystemTime(nil)
 	}
 
@@ -57,11 +60,11 @@ func NewDateEdit(parent Container) (*DateEdit, error) {
 }
 
 func NewDateEditWithNoneOption(parent Container) (*DateEdit, error) {
-	return newDateEdit(parent, win.DTS_SHOWNONE)
+	return newDateEdit(parent, commctrl.DTS_SHOWNONE)
 }
 
-func (de *DateEdit) systemTimeToTime(st *win.SYSTEMTIME) time.Time {
-	if st == nil || !de.hasStyleBits(win.DTS_SHOWNONE) && st.WYear == 1601 && st.WMonth == 1 && st.WDay == 1 {
+func (de *DateEdit) systemTimeToTime(st *kernel32.SYSTEMTIME) time.Time {
+	if st == nil || !de.hasStyleBits(commctrl.DTS_SHOWNONE) && st.WYear == 1601 && st.WMonth == 1 && st.WDay == 1 {
 		return time.Time{}
 	}
 
@@ -75,12 +78,12 @@ func (de *DateEdit) systemTimeToTime(st *win.SYSTEMTIME) time.Time {
 	return time.Date(int(st.WYear), time.Month(st.WMonth), int(st.WDay), hour, minute, second, 0, time.Local)
 }
 
-func (de *DateEdit) timeToSystemTime(t time.Time) *win.SYSTEMTIME {
+func (de *DateEdit) timeToSystemTime(t time.Time) *kernel32.SYSTEMTIME {
 	if t.Year() < 1601 {
-		if de.hasStyleBits(win.DTS_SHOWNONE) {
+		if de.hasStyleBits(commctrl.DTS_SHOWNONE) {
 			return nil
 		} else {
-			return &win.SYSTEMTIME{
+			return &kernel32.SYSTEMTIME{
 				WYear:  uint16(1601),
 				WMonth: uint16(1),
 				WDay:   uint16(1),
@@ -88,7 +91,7 @@ func (de *DateEdit) timeToSystemTime(t time.Time) *win.SYSTEMTIME {
 		}
 	}
 
-	st := &win.SYSTEMTIME{
+	st := &kernel32.SYSTEMTIME{
 		WYear:  uint16(t.Year()),
 		WMonth: uint16(t.Month()),
 		WDay:   uint16(t.Day()),
@@ -103,33 +106,33 @@ func (de *DateEdit) timeToSystemTime(t time.Time) *win.SYSTEMTIME {
 	return st
 }
 
-func (de *DateEdit) systemTime() (*win.SYSTEMTIME, error) {
-	var st win.SYSTEMTIME
+func (de *DateEdit) systemTime() (*kernel32.SYSTEMTIME, error) {
+	var st kernel32.SYSTEMTIME
 
-	switch de.SendMessage(win.DTM_GETSYSTEMTIME, 0, uintptr(unsafe.Pointer(&st))) {
-	case win.GDT_VALID:
+	switch de.SendMessage(commctrl.DTM_GETSYSTEMTIME, 0, uintptr(unsafe.Pointer(&st))) {
+	case commctrl.GDT_VALID:
 		return &st, nil
 
-	case win.GDT_NONE:
+	case commctrl.GDT_NONE:
 		return nil, nil
 	}
 
 	return nil, newError("SendMessage(DTM_GETSYSTEMTIME)")
 }
 
-func (de *DateEdit) setSystemTime(st *win.SYSTEMTIME) error {
+func (de *DateEdit) setSystemTime(st *kernel32.SYSTEMTIME) error {
 	var wParam uintptr
 
 	if st != nil {
-		wParam = win.GDT_VALID
+		wParam = commctrl.GDT_VALID
 	} else {
 		// Ensure today's date is displayed.
 		de.setSystemTime(de.timeToSystemTime(time.Now()))
 
-		wParam = win.GDT_NONE
+		wParam = commctrl.GDT_NONE
 	}
 
-	if 0 == de.SendMessage(win.DTM_SETSYSTEMTIME, wParam, uintptr(unsafe.Pointer(st))) {
+	if de.SendMessage(commctrl.DTM_SETSYSTEMTIME, wParam, uintptr(unsafe.Pointer(st))) == 0 {
 		return newError("SendMessage(DTM_SETSYSTEMTIME)")
 	}
 
@@ -145,9 +148,13 @@ func (de *DateEdit) Format() string {
 }
 
 func (de *DateEdit) SetFormat(format string) error {
-	lp := uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(format)))
+	strPtr, err := syscall.UTF16PtrFromString(format)
+	if err != nil {
+		newError(err.Error())
+	}
+	lp := uintptr(unsafe.Pointer(strPtr))
 
-	if 0 == de.SendMessage(win.DTM_SETFORMAT, 0, lp) {
+	if de.SendMessage(commctrl.DTM_SETFORMAT, 0, lp) == 0 {
 		return newError("DTM_SETFORMAT failed")
 	}
 
@@ -157,15 +164,15 @@ func (de *DateEdit) SetFormat(format string) error {
 }
 
 func (de *DateEdit) Range() (min, max time.Time) {
-	var st [2]win.SYSTEMTIME
+	var st [2]kernel32.SYSTEMTIME
 
-	ret := de.SendMessage(win.DTM_GETRANGE, 0, uintptr(unsafe.Pointer(&st[0])))
+	ret := de.SendMessage(commctrl.DTM_GETRANGE, 0, uintptr(unsafe.Pointer(&st[0])))
 
-	if ret&win.GDTR_MIN > 0 {
+	if ret&commctrl.GDTR_MIN > 0 {
 		min = de.systemTimeToTime(&st[0])
 	}
 
-	if ret&win.GDTR_MAX > 0 {
+	if ret&commctrl.GDTR_MAX > 0 {
 		max = de.systemTimeToTime(&st[1])
 	}
 
@@ -181,20 +188,20 @@ func (de *DateEdit) SetRange(min, max time.Time) error {
 		}
 	}
 
-	var st [2]win.SYSTEMTIME
+	var st [2]kernel32.SYSTEMTIME
 	var wParam uintptr
 
 	if !min.IsZero() {
-		wParam |= win.GDTR_MIN
+		wParam |= commctrl.GDTR_MIN
 		st[0] = *de.timeToSystemTime(min)
 	}
 
 	if !max.IsZero() {
-		wParam |= win.GDTR_MAX
+		wParam |= commctrl.GDTR_MAX
 		st[1] = *de.timeToSystemTime(max)
 	}
 
-	if 0 == de.SendMessage(win.DTM_SETRANGE, wParam, uintptr(unsafe.Pointer(&st[0]))) {
+	if de.SendMessage(commctrl.DTM_SETRANGE, wParam, uintptr(unsafe.Pointer(&st[0]))) == 0 {
 		return newError("SendMessage(DTM_SETRANGE)")
 	}
 
@@ -232,11 +239,11 @@ func (de *DateEdit) DateChanged() *Event {
 	return de.dateChangedPublisher.Event()
 }
 
-func (de *DateEdit) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (de *DateEdit) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_NOTIFY:
-		switch uint32(((*win.NMHDR)(unsafe.Pointer(lParam))).Code) {
-		case win.DTN_DATETIMECHANGE:
+	case user32.WM_NOTIFY:
+		switch uint32(((*user32.NMHDR)(unsafe.Pointer(lParam))).Code) {
+		case commctrl.DTN_DATETIMECHANGE:
 			de.dateChangedPublisher.Publish()
 		}
 	}

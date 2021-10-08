@@ -4,11 +4,9 @@
 
 // +build windows
 
-package walk
+package winapi
 
-import (
-	"github.com/lxn/win"
-)
+import "github.com/Gipcomp/win32/handle"
 
 type widgetListObserver interface {
 	onInsertingWidget(index int, widget Widget) error
@@ -78,7 +76,7 @@ func (l *WidgetList) Contains(item Widget) bool {
 	return l.Index(item) > -1
 }
 
-func (l *WidgetList) indexHandle(handle win.HWND) int {
+func (l *WidgetList) indexHandle(handle handle.HWND) int {
 	for i, widget := range l.items {
 		if widget.Handle() == handle {
 			return i
@@ -88,7 +86,7 @@ func (l *WidgetList) indexHandle(handle win.HWND) int {
 	return -1
 }
 
-func (l *WidgetList) containsHandle(handle win.HWND) bool {
+func (l *WidgetList) containsHandle(handle handle.HWND) bool {
 	return l.indexHandle(handle) > -1
 }
 

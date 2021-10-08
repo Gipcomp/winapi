@@ -4,20 +4,22 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
-	"unsafe"
-)
-
-import (
-	"github.com/lxn/win"
 	"syscall"
+	"unsafe"
+
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/ole32"
+	"github.com/Gipcomp/win32/shobj"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 type ProgressIndicator struct {
-	hwnd                   win.HWND
-	taskbarList3           *win.ITaskbarList3
+	hwnd                   handle.HWND
+	taskbarList3           *shobj.ITaskbarList3
 	completed              uint32
 	total                  uint32
 	state                  PIState
@@ -28,29 +30,29 @@ type ProgressIndicator struct {
 type PIState int
 
 const (
-	PINoProgress    PIState = win.TBPF_NOPROGRESS
-	PIIndeterminate PIState = win.TBPF_INDETERMINATE
-	PINormal        PIState = win.TBPF_NORMAL
-	PIError         PIState = win.TBPF_ERROR
-	PIPaused        PIState = win.TBPF_PAUSED
+	PINoProgress    PIState = shobj.TBPF_NOPROGRESS
+	PIIndeterminate PIState = shobj.TBPF_INDETERMINATE
+	PINormal        PIState = shobj.TBPF_NORMAL
+	PIError         PIState = shobj.TBPF_ERROR
+	PIPaused        PIState = shobj.TBPF_PAUSED
 )
 
 //newTaskbarList3 precondition: Windows version is at least 6.1 (yes, Win 7 is version 6.1).
-func newTaskbarList3(hwnd win.HWND) (*ProgressIndicator, error) {
+func newTaskbarList3(hwnd handle.HWND) (*ProgressIndicator, error) {
 	var classFactoryPtr unsafe.Pointer
-	if hr := win.CoGetClassObject(&win.CLSID_TaskbarList, win.CLSCTX_ALL, nil, &win.IID_IClassFactory, &classFactoryPtr); win.FAILED(hr) {
+	if hr := ole32.CoGetClassObject(&shobj.CLSID_TaskbarList, ole32.CLSCTX_ALL, nil, &ole32.IID_IClassFactory, &classFactoryPtr); win.FAILED(hr) {
 		return nil, errorFromHRESULT("CoGetClassObject", hr)
 	}
 
 	var taskbarList3ObjectPtr unsafe.Pointer
-	classFactory := (*win.IClassFactory)(classFactoryPtr)
+	classFactory := (*ole32.IClassFactory)(classFactoryPtr)
 	defer classFactory.Release()
 
-	if hr := classFactory.CreateInstance(nil, &win.IID_ITaskbarList3, &taskbarList3ObjectPtr); win.FAILED(hr) {
+	if hr := classFactory.CreateInstance(nil, &shobj.IID_ITaskbarList3, &taskbarList3ObjectPtr); win.FAILED(hr) {
 		return nil, errorFromHRESULT("IClassFactory.CreateInstance", hr)
 	}
 
-	return &ProgressIndicator{taskbarList3: (*win.ITaskbarList3)(taskbarList3ObjectPtr), hwnd: hwnd}, nil
+	return &ProgressIndicator{taskbarList3: (*shobj.ITaskbarList3)(taskbarList3ObjectPtr), hwnd: hwnd}, nil
 }
 
 func (pi *ProgressIndicator) SetState(state PIState) error {
@@ -86,9 +88,9 @@ func (pi *ProgressIndicator) Completed() uint32 {
 }
 
 func (pi *ProgressIndicator) SetOverlayIcon(icon *Icon, description string) error {
-	handle := win.HICON(0)
+	handle := user32.HICON(0)
 	if icon != nil {
-		handle = icon.handleForDPI(int(win.GetDpiForWindow(pi.hwnd)))
+		handle = icon.handleForDPI(int(user32.GetDpiForWindow(pi.hwnd)))
 	}
 	description16, err := syscall.UTF16PtrFromString(description)
 	if err != nil {

@@ -4,25 +4,26 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"fmt"
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/winuser"
 )
 
 type Menu struct {
-	hMenu   win.HMENU
+	hMenu   winuser.HMENU
 	window  Window
 	actions *ActionList
 	getDPI  func() int
 }
 
 func newMenuBar(window Window) (*Menu, error) {
-	hMenu := win.CreateMenu()
+	hMenu := user32.CreateMenu()
 	if hMenu == 0 {
 		return nil, lastError("CreateMenu")
 	}
@@ -37,22 +38,22 @@ func newMenuBar(window Window) (*Menu, error) {
 }
 
 func NewMenu() (*Menu, error) {
-	hMenu := win.CreatePopupMenu()
+	hMenu := user32.CreatePopupMenu()
 	if hMenu == 0 {
 		return nil, lastError("CreatePopupMenu")
 	}
 
-	var mi win.MENUINFO
+	var mi winuser.MENUINFO
 	mi.CbSize = uint32(unsafe.Sizeof(mi))
 
-	if !win.GetMenuInfo(hMenu, &mi) {
+	if !user32.GetMenuInfo(hMenu, &mi) {
 		return nil, lastError("GetMenuInfo")
 	}
 
-	mi.FMask |= win.MIM_STYLE
-	mi.DwStyle = win.MNS_CHECKORBMP
+	mi.FMask |= winuser.MIM_STYLE
+	mi.DwStyle = winuser.MNS_CHECKORBMP
 
-	if !win.SetMenuInfo(hMenu, &mi) {
+	if !user32.SetMenuInfo(hMenu, &mi) {
 		return nil, lastError("SetMenuInfo")
 	}
 
@@ -68,7 +69,7 @@ func (m *Menu) Dispose() {
 	m.actions.Clear()
 
 	if m.hMenu != 0 {
-		win.DestroyMenu(m.hMenu)
+		user32.DestroyMenu(m.hMenu)
 		m.hMenu = 0
 	}
 }
@@ -99,11 +100,11 @@ func (m *Menu) updateItemsWithImageForWindow(window Window) {
 	}
 }
 
-func (m *Menu) initMenuItemInfoFromAction(mii *win.MENUITEMINFO, action *Action) {
+func (m *Menu) initMenuItemInfoFromAction(mii *winuser.MENUITEMINFO, action *Action) {
 	mii.CbSize = uint32(unsafe.Sizeof(*mii))
-	mii.FMask = win.MIIM_FTYPE | win.MIIM_ID | win.MIIM_STATE | win.MIIM_STRING
+	mii.FMask = winuser.MIIM_FTYPE | winuser.MIIM_ID | winuser.MIIM_STATE | winuser.MIIM_STRING
 	if action.image != nil {
-		mii.FMask |= win.MIIM_BITMAP
+		mii.FMask |= winuser.MIIM_BITMAP
 		dpi := 96
 		if m.getDPI != nil {
 			dpi = m.getDPI()
@@ -117,39 +118,44 @@ func (m *Menu) initMenuItemInfoFromAction(mii *win.MENUITEMINFO, action *Action)
 		}
 	}
 	if action.IsSeparator() {
-		mii.FType |= win.MFT_SEPARATOR
+		mii.FType |= winuser.MFT_SEPARATOR
 	} else {
-		mii.FType |= win.MFT_STRING
+		mii.FType |= winuser.MFT_STRING
 		var text string
 		if s := action.shortcut; s.Key != 0 {
 			text = fmt.Sprintf("%s\t%s", action.text, s.String())
 		} else {
 			text = action.text
 		}
-		mii.DwTypeData = syscall.StringToUTF16Ptr(text)
+
+		var err error
+		mii.DwTypeData, err = syscall.UTF16PtrFromString(text)
+		if err != nil {
+			newError(err.Error())
+		}
 		mii.Cch = uint32(len([]rune(action.text)))
 	}
 	mii.WID = uint32(action.id)
 
 	if action.Enabled() {
-		mii.FState &^= win.MFS_DISABLED
+		mii.FState &^= winuser.MFS_DISABLED
 	} else {
-		mii.FState |= win.MFS_DISABLED
+		mii.FState |= winuser.MFS_DISABLED
 	}
 
 	if action.Checkable() {
-		mii.FMask |= win.MIIM_CHECKMARKS
+		mii.FMask |= winuser.MIIM_CHECKMARKS
 	}
 	if action.Checked() {
-		mii.FState |= win.MFS_CHECKED
+		mii.FState |= winuser.MFS_CHECKED
 	}
 	if action.Exclusive() {
-		mii.FType |= win.MFT_RADIOCHECK
+		mii.FType |= winuser.MFT_RADIOCHECK
 	}
 
 	menu := action.menu
 	if menu != nil {
-		mii.FMask |= win.MIIM_SUBMENU
+		mii.FMask |= winuser.MIIM_SUBMENU
 		mii.HSubMenu = menu.hMenu
 	}
 }
@@ -157,7 +163,7 @@ func (m *Menu) initMenuItemInfoFromAction(mii *win.MENUITEMINFO, action *Action)
 func (m *Menu) handleDefaultState(action *Action) {
 	if action.Default() {
 		// Unset other default actions before we set this one. Otherwise insertion fails.
-		win.SetMenuDefaultItem(m.hMenu, ^uint32(0), false)
+		user32.SetMenuDefaultItem(m.hMenu, ^uint32(0), false)
 		for _, otherAction := range m.actions.actions {
 			if otherAction != action {
 				otherAction.SetDefault(false)
@@ -173,16 +179,16 @@ func (m *Menu) onActionChanged(action *Action) error {
 		return nil
 	}
 
-	var mii win.MENUITEMINFO
+	var mii winuser.MENUITEMINFO
 
 	m.initMenuItemInfoFromAction(&mii, action)
 
-	if !win.SetMenuItemInfo(m.hMenu, uint32(m.actions.indexInObserver(action)), true, &mii) {
+	if !user32.SetMenuItemInfo(m.hMenu, uint32(m.actions.indexInObserver(action)), true, &mii) {
 		return newError("SetMenuItemInfo failed")
 	}
 
 	if action.Default() {
-		win.SetMenuDefaultItem(m.hMenu, uint32(m.actions.indexInObserver(action)), true)
+		user32.SetMenuDefaultItem(m.hMenu, uint32(m.actions.indexInObserver(action)), true)
 	}
 
 	if action.Exclusive() && action.Checked() {
@@ -204,7 +210,7 @@ func (m *Menu) onActionChanged(action *Action) error {
 			}
 		}
 
-		if !win.CheckMenuRadioItem(m.hMenu, uint32(first), uint32(last), uint32(index), win.MF_BYPOSITION) {
+		if !user32.CheckMenuRadioItem(m.hMenu, uint32(first), uint32(last), uint32(index), winuser.MF_BYPOSITION) {
 			return newError("CheckMenuRadioItem failed")
 		}
 	}
@@ -242,16 +248,16 @@ func (m *Menu) insertAction(action *Action, visibleChanged bool) (err error) {
 
 	index := m.actions.indexInObserver(action)
 
-	var mii win.MENUITEMINFO
+	var mii winuser.MENUITEMINFO
 
 	m.initMenuItemInfoFromAction(&mii, action)
 
-	if !win.InsertMenuItem(m.hMenu, uint32(index), true, &mii) {
+	if !user32.InsertMenuItem(m.hMenu, uint32(index), true, &mii) {
 		return newError("InsertMenuItem failed")
 	}
 
 	if action.Default() {
-		win.SetMenuDefaultItem(m.hMenu, uint32(m.actions.indexInObserver(action)), true)
+		user32.SetMenuDefaultItem(m.hMenu, uint32(m.actions.indexInObserver(action)), true)
 	}
 
 	menu := action.menu
@@ -267,7 +273,7 @@ func (m *Menu) insertAction(action *Action, visibleChanged bool) (err error) {
 func (m *Menu) removeAction(action *Action, visibleChanged bool) error {
 	index := m.actions.indexInObserver(action)
 
-	if !win.RemoveMenu(m.hMenu, uint32(index), win.MF_BYPOSITION) {
+	if !user32.RemoveMenu(m.hMenu, uint32(index), winuser.MF_BYPOSITION) {
 		return lastError("RemoveMenu")
 	}
 
@@ -283,7 +289,7 @@ func (m *Menu) removeAction(action *Action, visibleChanged bool) error {
 func (m *Menu) ensureMenuBarRedrawn() {
 	if m.window != nil {
 		if mw, ok := m.window.(*MainWindow); ok && mw != nil {
-			win.DrawMenuBar(mw.Handle())
+			user32.DrawMenuBar(mw.Handle())
 		}
 	}
 }

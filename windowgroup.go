@@ -4,13 +4,17 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"sync"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/ole32"
+	"github.com/Gipcomp/win32/oleacc"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 // The global window group manager instance.
@@ -95,7 +99,7 @@ type WindowGroup struct {
 	toolTip         *ToolTip
 	activeForm      Form
 	oleInit         bool
-	accPropServices *win.IAccPropServices
+	accPropServices *oleacc.IAccPropServices
 
 	syncMutex           sync.Mutex
 	syncFuncs           []func()                   // Functions queued to run on the group's thread
@@ -106,7 +110,7 @@ type WindowGroup struct {
 //
 // The completion function will be called when the group is disposed of.
 func newWindowGroup(threadID uint32, completion func(uint32)) *WindowGroup {
-	hr := win.OleInitialize()
+	hr := ole32.OleInitialize()
 
 	return &WindowGroup{
 		threadID:            threadID,
@@ -127,13 +131,13 @@ func (g *WindowGroup) Refs() int {
 }
 
 // AccessibilityServices returns an instance of CLSID_AccPropServices class.
-func (g *WindowGroup) accessibilityServices() *win.IAccPropServices {
+func (g *WindowGroup) accessibilityServices() *oleacc.IAccPropServices {
 	if g.accPropServices != nil {
 		return g.accPropServices
 	}
 
-	var accPropServices *win.IAccPropServices
-	hr := win.CoCreateInstance(&win.CLSID_AccPropServices, nil, win.CLSCTX_ALL, &win.IID_IAccPropServices, (*unsafe.Pointer)(unsafe.Pointer(&accPropServices)))
+	var accPropServices *oleacc.IAccPropServices
+	hr := ole32.CoCreateInstance(&oleacc.CLSID_AccPropServices, nil, ole32.CLSCTX_ALL, &oleacc.IID_IAccPropServices, (*unsafe.Pointer)(unsafe.Pointer(&accPropServices)))
 	if win.FAILED(hr) {
 		return nil
 	}
@@ -144,23 +148,23 @@ func (g *WindowGroup) accessibilityServices() *win.IAccPropServices {
 
 // accPropIds is a static list of accessibility properties user (may) set for a window
 // and we should clear when the window is disposed.
-var accPropIds = []win.MSAAPROPID{
-	win.PROPID_ACC_DEFAULTACTION,
-	win.PROPID_ACC_DESCRIPTION,
-	win.PROPID_ACC_HELP,
-	win.PROPID_ACC_KEYBOARDSHORTCUT,
-	win.PROPID_ACC_NAME,
-	win.PROPID_ACC_ROLE,
-	win.PROPID_ACC_ROLEMAP,
-	win.PROPID_ACC_STATE,
-	win.PROPID_ACC_STATEMAP,
-	win.PROPID_ACC_VALUEMAP,
+var accPropIds = []oleacc.MSAAPROPID{
+	oleacc.PROPID_ACC_DEFAULTACTION,
+	oleacc.PROPID_ACC_DESCRIPTION,
+	oleacc.PROPID_ACC_HELP,
+	oleacc.PROPID_ACC_KEYBOARDSHORTCUT,
+	oleacc.PROPID_ACC_NAME,
+	oleacc.PROPID_ACC_ROLE,
+	oleacc.PROPID_ACC_ROLEMAP,
+	oleacc.PROPID_ACC_STATE,
+	oleacc.PROPID_ACC_STATEMAP,
+	oleacc.PROPID_ACC_VALUEMAP,
 }
 
 // accClearHwndProps clears all window properties for Dynamic Annotation to release resources.
-func (g *WindowGroup) accClearHwndProps(hwnd win.HWND) {
+func (g *WindowGroup) accClearHwndProps(hwnd handle.HWND) {
 	if g.accPropServices != nil {
-		g.accPropServices.ClearHwndProps(hwnd, win.OBJID_CLIENT, win.CHILDID_SELF, accPropIds)
+		g.accPropServices.ClearHwndProps(hwnd, user32.OBJID_CLIENT, user32.CHILDID_SELF, accPropIds)
 	}
 }
 
@@ -309,7 +313,7 @@ func (g *WindowGroup) dispose() {
 	}
 
 	if g.oleInit {
-		win.OleUninitialize()
+		ole32.OleUninitialize()
 		g.oleInit = false
 	}
 

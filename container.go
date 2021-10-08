@@ -4,14 +4,17 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"time"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 type Container interface {
@@ -196,10 +199,10 @@ func (cb *ContainerBase) RestoreState() error {
 }
 
 func (cb *ContainerBase) doPaint() error {
-	var ps win.PAINTSTRUCT
+	var ps user32.PAINTSTRUCT
 
-	hdc := win.BeginPaint(cb.hWnd, &ps)
-	defer win.EndPaint(cb.hWnd, &ps)
+	hdc := user32.BeginPaint(cb.hWnd, &ps)
+	defer user32.EndPaint(cb.hWnd, &ps)
 
 	canvas, err := newCanvasFromHDC(hdc)
 	if err != nil {
@@ -222,7 +225,7 @@ func (cb *ContainerBase) doPaint() error {
 					}
 				}
 
-				if hwnd := widget.Handle(); !win.IsWindowEnabled(hwnd) || !win.IsWindowVisible(hwnd) {
+				if hwnd := widget.Handle(); !user32.IsWindowEnabled(hwnd) || !user32.IsWindowVisible(hwnd) {
 					continue
 				}
 
@@ -231,7 +234,7 @@ func (cb *ContainerBase) doPaint() error {
 			}
 
 			b := widget.BoundsPixels().toRECT()
-			win.ExcludeClipRect(hdc, b.Left, b.Top, b.Right, b.Bottom)
+			gdi32.ExcludeClipRect(hdc, b.Left, b.Top, b.Right, b.Bottom)
 
 			if err := effect.Draw(widget, canvas); err != nil {
 				return err
@@ -240,13 +243,13 @@ func (cb *ContainerBase) doPaint() error {
 	}
 
 	if FocusEffect != nil {
-		hwndFocused := win.GetFocus()
+		hwndFocused := user32.GetFocus()
 		var widget Widget
 		if wnd := windowFromHandle(hwndFocused); wnd != nil {
 			widget, _ = wnd.(Widget)
 		}
 		for hwndFocused != 0 && (widget == nil || widget.Parent() == nil) {
-			hwndFocused = win.GetParent(hwndFocused)
+			hwndFocused = user32.GetParent(hwndFocused)
 			if wnd := windowFromHandle(hwndFocused); wnd != nil {
 				widget, _ = wnd.(Widget)
 			}
@@ -256,7 +259,7 @@ func (cb *ContainerBase) doPaint() error {
 			for _, effect := range widget.GraphicsEffects().items {
 				if effect == FocusEffect {
 					b := widget.BoundsPixels().toRECT()
-					win.ExcludeClipRect(hdc, b.Left, b.Top, b.Right, b.Bottom)
+					gdi32.ExcludeClipRect(hdc, b.Left, b.Top, b.Right, b.Bottom)
 
 					if err := FocusEffect.Draw(widget, canvas); err != nil {
 						return err
@@ -269,14 +272,14 @@ func (cb *ContainerBase) doPaint() error {
 	return nil
 }
 
-func (cb *ContainerBase) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (cb *ContainerBase) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_CTLCOLOREDIT, win.WM_CTLCOLORSTATIC:
+	case user32.WM_CTLCOLOREDIT, user32.WM_CTLCOLORSTATIC:
 		if hBrush := cb.handleWMCTLCOLOR(wParam, lParam); hBrush != 0 {
 			return hBrush
 		}
 
-	case win.WM_PAINT:
+	case user32.WM_PAINT:
 		if FocusEffect == nil && InteractionEffect == nil && ValidationErrorEffect == nil {
 			break
 		}
@@ -286,13 +289,13 @@ func (cb *ContainerBase) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintp
 
 		return 0
 
-	case win.WM_COMMAND:
+	case user32.WM_COMMAND:
 		if lParam == 0 {
 			switch win.HIWORD(uint32(wParam)) {
 			case 0:
 				cmdId := win.LOWORD(uint32(wParam))
 				switch cmdId {
-				case win.IDOK, win.IDCANCEL:
+				case user32.IDOK, user32.IDCANCEL:
 					form := ancestor(cb)
 					if form == nil {
 						break
@@ -304,7 +307,7 @@ func (cb *ContainerBase) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintp
 					}
 
 					var button *PushButton
-					if cmdId == win.IDOK {
+					if cmdId == user32.IDOK {
 						button = dlg.DefaultButton()
 					} else {
 						button = dlg.CancelButton()
@@ -313,8 +316,6 @@ func (cb *ContainerBase) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintp
 					if button != nil && button.Visible() && button.Enabled() {
 						button.raiseClicked()
 					}
-
-					break
 				}
 
 				// Menu
@@ -329,12 +330,12 @@ func (cb *ContainerBase) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintp
 			}
 		} else {
 			// The window that sent the notification shall handle it itself.
-			hwndSrc := win.GetDlgItem(cb.hWnd, int32(win.LOWORD(uint32(wParam))))
+			hwndSrc := user32.GetDlgItem(cb.hWnd, int32(win.LOWORD(uint32(wParam))))
 
 			var toolBarOnly bool
 			if hwndSrc == 0 {
 				toolBarOnly = true
-				hwndSrc = win.HWND(lParam)
+				hwndSrc = handle.HWND(lParam)
 			}
 
 			if window := windowFromHandle(hwndSrc); window != nil {
@@ -347,37 +348,37 @@ func (cb *ContainerBase) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintp
 			}
 		}
 
-	case win.WM_MEASUREITEM:
-		mis := (*win.MEASUREITEMSTRUCT)(unsafe.Pointer(lParam))
-		if window := windowFromHandle(win.GetDlgItem(hwnd, int32(mis.CtlID))); window != nil {
+	case user32.WM_MEASUREITEM:
+		mis := (*user32.MEASUREITEMSTRUCT)(unsafe.Pointer(lParam))
+		if window := windowFromHandle(user32.GetDlgItem(hwnd, int32(mis.CtlID))); window != nil {
 			// The window that sent the notification shall handle it itself.
 			return window.WndProc(hwnd, msg, wParam, lParam)
 		}
 
-	case win.WM_DRAWITEM:
-		dis := (*win.DRAWITEMSTRUCT)(unsafe.Pointer(lParam))
+	case user32.WM_DRAWITEM:
+		dis := (*user32.DRAWITEMSTRUCT)(unsafe.Pointer(lParam))
 		if window := windowFromHandle(dis.HwndItem); window != nil {
 			// The window that sent the notification shall handle it itself.
 			return window.WndProc(hwnd, msg, wParam, lParam)
 		}
 
-	case win.WM_NOTIFY:
-		nmh := (*win.NMHDR)(unsafe.Pointer(lParam))
+	case user32.WM_NOTIFY:
+		nmh := (*user32.NMHDR)(unsafe.Pointer(lParam))
 		if window := windowFromHandle(nmh.HwndFrom); window != nil {
 			// The window that sent the notification shall handle it itself.
 			return window.WndProc(hwnd, msg, wParam, lParam)
 		}
 
-	case win.WM_HSCROLL, win.WM_VSCROLL:
-		if window := windowFromHandle(win.HWND(lParam)); window != nil {
+	case user32.WM_HSCROLL, user32.WM_VSCROLL:
+		if window := windowFromHandle(handle.HWND(lParam)); window != nil {
 			// The window that sent the notification shall handle it itself.
 			return window.WndProc(hwnd, msg, wParam, lParam)
 		}
 
-	case win.WM_WINDOWPOSCHANGED:
-		wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
+	case user32.WM_WINDOWPOSCHANGED:
+		wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
 
-		if wp.Flags&win.SWP_NOSIZE != 0 || cb.Layout() == nil {
+		if wp.Flags&user32.SWP_NOSIZE != 0 || cb.Layout() == nil {
 			break
 		}
 
@@ -466,19 +467,19 @@ func (cb *ContainerBase) focusFirstCandidateDescendant() {
 	}
 }
 
-func firstFocusableDescendantCallback(hwnd win.HWND, lParam uintptr) uintptr {
-	if !win.IsWindowVisible(hwnd) || !win.IsWindowEnabled(hwnd) {
+func firstFocusableDescendantCallback(hwnd handle.HWND, lParam uintptr) uintptr {
+	if !user32.IsWindowVisible(hwnd) || !user32.IsWindowEnabled(hwnd) {
 		return 1
 	}
 
-	if win.GetWindowLong(hwnd, win.GWL_STYLE)&win.WS_TABSTOP > 0 {
+	if user32.GetWindowLong(hwnd, user32.GWL_STYLE)&user32.WS_TABSTOP > 0 {
 		if rb, ok := windowFromHandle(hwnd).(radioButtonish); ok {
 			if !rb.radioButton().Checked() {
 				return 1
 			}
 		}
 
-		hwndPtr := (*win.HWND)(unsafe.Pointer(lParam))
+		hwndPtr := (*handle.HWND)(unsafe.Pointer(lParam))
 		*hwndPtr = hwnd
 		return 0
 	}
@@ -495,14 +496,14 @@ func init() {
 }
 
 func firstFocusableDescendant(container Container) Window {
-	var hwnd win.HWND
+	var hwnd handle.HWND
 
-	win.EnumChildWindows(container.Handle(), firstFocusableDescendantCallbackPtr, uintptr(unsafe.Pointer(&hwnd)))
+	user32.EnumChildWindows(container.Handle(), firstFocusableDescendantCallbackPtr, uintptr(unsafe.Pointer(&hwnd)))
 
 	window := windowFromHandle(hwnd)
 
 	for hwnd != 0 && window == nil {
-		hwnd = win.GetParent(hwnd)
+		hwnd = user32.GetParent(hwnd)
 		window = windowFromHandle(hwnd)
 	}
 

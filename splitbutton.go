@@ -4,14 +4,14 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"unsafe"
-)
 
-import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
 )
 
 type SplitButton struct {
@@ -29,7 +29,7 @@ func NewSplitButton(parent Container) (*SplitButton, error) {
 		sb,
 		parent,
 		"BUTTON",
-		win.WS_TABSTOP|win.WS_VISIBLE|win.BS_SPLITBUTTON,
+		user32.WS_TABSTOP|user32.WS_VISIBLE|user32.BS_SPLITBUTTON,
 		0); err != nil {
 		return nil, err
 	}
@@ -60,11 +60,11 @@ func (sb *SplitButton) Dispose() {
 }
 
 func (sb *SplitButton) ImageAboveText() bool {
-	return sb.hasStyleBits(win.BS_TOP)
+	return sb.hasStyleBits(user32.BS_TOP)
 }
 
 func (sb *SplitButton) SetImageAboveText(value bool) error {
-	if err := sb.ensureStyleBits(win.BS_TOP, value); err != nil {
+	if err := sb.ensureStyleBits(user32.BS_TOP, value); err != nil {
 		return err
 	}
 
@@ -77,20 +77,20 @@ func (sb *SplitButton) Menu() *Menu {
 	return sb.menu
 }
 
-func (sb *SplitButton) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (sb *SplitButton) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_NOTIFY:
-		switch ((*win.NMHDR)(unsafe.Pointer(lParam))).Code {
-		case win.BCN_DROPDOWN:
-			dd := (*win.NMBCDROPDOWN)(unsafe.Pointer(lParam))
+	case user32.WM_NOTIFY:
+		switch ((*user32.NMHDR)(unsafe.Pointer(lParam))).Code {
+		case user32.BCN_DROPDOWN:
+			dd := (*user32.NMBCDROPDOWN)(unsafe.Pointer(lParam))
 
-			p := win.POINT{dd.RcButton.Left, dd.RcButton.Bottom}
+			p := gdi32.POINT{dd.RcButton.Left, dd.RcButton.Bottom}
 
-			win.ClientToScreen(sb.hWnd, &p)
+			user32.ClientToScreen(sb.hWnd, &p)
 
-			win.TrackPopupMenuEx(
+			user32.TrackPopupMenuEx(
 				sb.menu.hMenu,
-				win.TPM_NOANIMATION,
+				user32.TPM_NOANIMATION,
 				p.X,
 				p.Y,
 				sb.hWnd,

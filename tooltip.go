@@ -4,13 +4,16 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/bb760416(v=vs.85).aspx says 80,
@@ -28,7 +31,7 @@ func NewToolTip() (*ToolTip, error) {
 		return nil, err
 	}
 
-	win.SetWindowPos(tt.hWnd, win.HWND_TOPMOST, 0, 0, 0, 0, win.SWP_NOMOVE|win.SWP_NOSIZE|win.SWP_NOACTIVATE)
+	user32.SetWindowPos(tt.hWnd, user32.HWND_TOPMOST, 0, 0, 0, 0, user32.SWP_NOMOVE|user32.SWP_NOSIZE|user32.SWP_NOACTIVATE)
 
 	return tt, nil
 }
@@ -40,7 +43,7 @@ func newToolTip(style uint32) (*ToolTip, error) {
 		tt,
 		nil,
 		"tooltips_class32",
-		win.WS_DISABLED|win.WS_POPUP|win.TTS_ALWAYSTIP|win.TTS_NOPREFIX|style,
+		user32.WS_DISABLED|user32.WS_POPUP|commctrl.TTS_ALWAYSTIP|commctrl.TTS_NOPREFIX|style,
 		0); err != nil {
 		return nil, err
 	}
@@ -52,7 +55,7 @@ func newToolTip(style uint32) (*ToolTip, error) {
 		}
 	}()
 
-	tt.SendMessage(win.TTM_SETMAXTIPWIDTH, 0, 300)
+	tt.SendMessage(commctrl.TTM_SETMAXTIPWIDTH, 0, 300)
 
 	succeeded = true
 
@@ -60,7 +63,7 @@ func newToolTip(style uint32) (*ToolTip, error) {
 }
 
 func (tt *ToolTip) Title() string {
-	var gt win.TTGETTITLE
+	var gt commctrl.TTGETTITLE
 
 	buf := make([]uint16, 100)
 
@@ -68,33 +71,36 @@ func (tt *ToolTip) Title() string {
 	gt.Cch = uint32(len(buf))
 	gt.PszTitle = &buf[0]
 
-	tt.SendMessage(win.TTM_GETTITLE, 0, uintptr(unsafe.Pointer(&gt)))
+	tt.SendMessage(commctrl.TTM_GETTITLE, 0, uintptr(unsafe.Pointer(&gt)))
 
 	return syscall.UTF16ToString(buf)
 }
 
 func (tt *ToolTip) SetTitle(title string) error {
-	return tt.setTitle(title, win.TTI_NONE)
+	return tt.setTitle(title, commctrl.TTI_NONE)
 }
 
 func (tt *ToolTip) SetInfoTitle(title string) error {
-	return tt.setTitle(title, win.TTI_INFO)
+	return tt.setTitle(title, commctrl.TTI_INFO)
 }
 
 func (tt *ToolTip) SetWarningTitle(title string) error {
-	return tt.setTitle(title, win.TTI_WARNING)
+	return tt.setTitle(title, commctrl.TTI_WARNING)
 }
 
 func (tt *ToolTip) SetErrorTitle(title string) error {
-	return tt.setTitle(title, win.TTI_ERROR)
+	return tt.setTitle(title, commctrl.TTI_ERROR)
 }
 
 func (tt *ToolTip) setTitle(title string, icon uintptr) error {
 	if len(title) > 99 {
 		title = title[:99]
 	}
-
-	if win.FALSE == tt.SendMessage(win.TTM_SETTITLE, icon, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(title)))) {
+	strPtr, err := syscall.UTF16PtrFromString(title)
+	if err != nil {
+		return err
+	}
+	if win.FALSE == tt.SendMessage(commctrl.TTM_SETTITLE, icon, uintptr(unsafe.Pointer(strPtr))) {
 		return newError("TTM_SETTITLE failed")
 	}
 
@@ -119,7 +125,7 @@ func (tt *ToolTip) track(tool Widget) error {
 		return newError("unknown tool")
 	}
 
-	tt.SendMessage(win.TTM_TRACKACTIVATE, 1, uintptr(unsafe.Pointer(ti)))
+	tt.SendMessage(commctrl.TTM_TRACKACTIVATE, 1, uintptr(unsafe.Pointer(ti)))
 
 	b := tool.BoundsPixels()
 
@@ -130,17 +136,17 @@ func (tt *ToolTip) track(tool Widget) error {
 		p.X = int32(b.X + b.Width/2)
 	}
 
-	win.ClientToScreen(tool.Parent().Handle(), &p)
+	user32.ClientToScreen(tool.Parent().Handle(), &p)
 
-	tt.SendMessage(win.TTM_TRACKPOSITION, 0, uintptr(win.MAKELONG(uint16(p.X), uint16(p.Y))))
+	tt.SendMessage(commctrl.TTM_TRACKPOSITION, 0, uintptr(win.MAKELONG(uint16(p.X), uint16(p.Y))))
 
-	var insertAfterHWND win.HWND
-	if form := tool.Form(); form != nil && win.GetForegroundWindow() == form.Handle() {
-		insertAfterHWND = win.HWND_TOP
+	var insertAfterHWND handle.HWND
+	if form := tool.Form(); form != nil && user32.GetForegroundWindow() == form.Handle() {
+		insertAfterHWND = user32.HWND_TOP
 	} else {
 		insertAfterHWND = tool.Handle()
 	}
-	win.SetWindowPos(tt.hWnd, insertAfterHWND, 0, 0, 0, 0, win.SWP_NOMOVE|win.SWP_NOSIZE|win.SWP_NOACTIVATE)
+	user32.SetWindowPos(tt.hWnd, insertAfterHWND, 0, 0, 0, 0, user32.SWP_NOMOVE|user32.SWP_NOSIZE|user32.SWP_NOACTIVATE)
 
 	return nil
 }
@@ -151,7 +157,7 @@ func (tt *ToolTip) untrack(tool Widget) error {
 		return newError("unknown tool")
 	}
 
-	tt.SendMessage(win.TTM_TRACKACTIVATE, 0, uintptr(unsafe.Pointer(ti)))
+	tt.SendMessage(commctrl.TTM_TRACKACTIVATE, 0, uintptr(unsafe.Pointer(ti)))
 
 	return nil
 }
@@ -164,23 +170,23 @@ func (tt *ToolTip) addTrackedTool(tool Widget) error {
 	return tt.addTool(tt.hwndForTool(tool), true)
 }
 
-func (tt *ToolTip) addTool(hwnd win.HWND, track bool) error {
+func (tt *ToolTip) addTool(hwnd handle.HWND, track bool) error {
 	if hwnd == 0 {
 		return nil
 	}
 
-	var ti win.TOOLINFO
+	var ti commctrl.TOOLINFO
 	ti.CbSize = uint32(unsafe.Sizeof(ti))
 	ti.Hwnd = hwnd
-	ti.UFlags = win.TTF_IDISHWND
+	ti.UFlags = commctrl.TTF_IDISHWND
 	if track {
-		ti.UFlags |= win.TTF_TRACK
+		ti.UFlags |= commctrl.TTF_TRACK
 	} else {
-		ti.UFlags |= win.TTF_SUBCLASS
+		ti.UFlags |= commctrl.TTF_SUBCLASS
 	}
 	ti.UId = uintptr(hwnd)
 
-	if win.FALSE == tt.SendMessage(win.TTM_ADDTOOL, 0, uintptr(unsafe.Pointer(&ti))) {
+	if win.FALSE == tt.SendMessage(commctrl.TTM_ADDTOOL, 0, uintptr(unsafe.Pointer(&ti))) {
 		return newError("TTM_ADDTOOL failed")
 	}
 
@@ -191,13 +197,13 @@ func (tt *ToolTip) RemoveTool(tool Widget) error {
 	return tt.removeTool(tt.hwndForTool(tool))
 }
 
-func (tt *ToolTip) removeTool(hwnd win.HWND) error {
-	var ti win.TOOLINFO
+func (tt *ToolTip) removeTool(hwnd handle.HWND) error {
+	var ti commctrl.TOOLINFO
 	ti.CbSize = uint32(unsafe.Sizeof(ti))
 	ti.Hwnd = hwnd
 	ti.UId = uintptr(hwnd)
 
-	tt.SendMessage(win.TTM_DELTOOL, 0, uintptr(unsafe.Pointer(&ti)))
+	tt.SendMessage(commctrl.TTM_DELTOOL, 0, uintptr(unsafe.Pointer(&ti)))
 
 	return nil
 }
@@ -206,7 +212,7 @@ func (tt *ToolTip) Text(tool Widget) string {
 	return tt.text(tt.hwndForTool(tool))
 }
 
-func (tt *ToolTip) text(hwnd win.HWND) string {
+func (tt *ToolTip) text(hwnd handle.HWND) string {
 	ti := tt.toolInfo(hwnd)
 	if ti == nil {
 		return ""
@@ -219,7 +225,7 @@ func (tt *ToolTip) SetText(tool Widget, text string) error {
 	return tt.setText(tt.hwndForTool(tool), text)
 }
 
-func (tt *ToolTip) setText(hwnd win.HWND, text string) error {
+func (tt *ToolTip) setText(hwnd handle.HWND, text string) error {
 	ti := tt.toolInfo(hwnd)
 	if ti == nil {
 		return newError("unknown tool")
@@ -237,16 +243,19 @@ func (tt *ToolTip) setText(hwnd win.HWND, text string) error {
 			break
 		}
 	}
+	var err error
+	ti.LpszText, err = syscall.UTF16PtrFromString(text)
+	if err != nil {
+		return err
+	}
 
-	ti.LpszText = syscall.StringToUTF16Ptr(text)
-
-	tt.SendMessage(win.TTM_SETTOOLINFO, 0, uintptr(unsafe.Pointer(ti)))
+	tt.SendMessage(commctrl.TTM_SETTOOLINFO, 0, uintptr(unsafe.Pointer(ti)))
 
 	return nil
 }
 
-func (tt *ToolTip) toolInfo(hwnd win.HWND) *win.TOOLINFO {
-	var ti win.TOOLINFO
+func (tt *ToolTip) toolInfo(hwnd handle.HWND) *commctrl.TOOLINFO {
+	var ti commctrl.TOOLINFO
 	var buf [maxToolTipTextLen]uint16
 
 	ti.CbSize = uint32(unsafe.Sizeof(ti))
@@ -254,15 +263,15 @@ func (tt *ToolTip) toolInfo(hwnd win.HWND) *win.TOOLINFO {
 	ti.UId = uintptr(hwnd)
 	ti.LpszText = &buf[0]
 
-	if win.FALSE == tt.SendMessage(win.TTM_GETTOOLINFO, 0, uintptr(unsafe.Pointer(&ti))) {
+	if win.FALSE == tt.SendMessage(commctrl.TTM_GETTOOLINFO, 0, uintptr(unsafe.Pointer(&ti))) {
 		return nil
 	}
 
 	return &ti
 }
 
-func (*ToolTip) hwndForTool(tool Widget) win.HWND {
-	if hftt, ok := tool.(interface{ handleForToolTip() win.HWND }); ok {
+func (*ToolTip) hwndForTool(tool Widget) handle.HWND {
+	if hftt, ok := tool.(interface{ handleForToolTip() handle.HWND }); ok {
 		return hftt.handleForToolTip()
 	}
 

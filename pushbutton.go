@@ -4,10 +4,11 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
 )
 
 type PushButton struct {
@@ -21,7 +22,7 @@ func NewPushButton(parent Container) (*PushButton, error) {
 		pb,
 		parent,
 		"BUTTON",
-		win.WS_TABSTOP|win.WS_VISIBLE|win.BS_PUSHBUTTON,
+		user32.WS_TABSTOP|user32.WS_VISIBLE|user32.BS_PUSHBUTTON,
 		0); err != nil {
 		return nil, err
 	}
@@ -35,11 +36,11 @@ func NewPushButton(parent Container) (*PushButton, error) {
 }
 
 func (pb *PushButton) ImageAboveText() bool {
-	return pb.hasStyleBits(win.BS_TOP)
+	return pb.hasStyleBits(user32.BS_TOP)
 }
 
 func (pb *PushButton) SetImageAboveText(value bool) error {
-	if err := pb.ensureStyleBits(win.BS_TOP, value); err != nil {
+	if err := pb.ensureStyleBits(user32.BS_TOP, value); err != nil {
 		return err
 	}
 
@@ -48,7 +49,7 @@ func (pb *PushButton) SetImageAboveText(value bool) error {
 	return pb.SetImage(pb.image)
 }
 
-func (pb *PushButton) ensureProperDialogDefaultButton(hwndFocus win.HWND) {
+func (pb *PushButton) ensureProperDialogDefaultButton(hwndFocus handle.HWND) {
 	widget := windowFromHandle(hwndFocus)
 	if widget == nil {
 		return
@@ -73,7 +74,7 @@ func (pb *PushButton) ensureProperDialogDefaultButton(hwndFocus win.HWND) {
 		return
 	}
 
-	if err := defBtn.setAndClearStyleBits(win.BS_DEFPUSHBUTTON, win.BS_PUSHBUTTON); err != nil {
+	if err := defBtn.setAndClearStyleBits(user32.BS_DEFPUSHBUTTON, user32.BS_PUSHBUTTON); err != nil {
 		return
 	}
 
@@ -82,10 +83,10 @@ func (pb *PushButton) ensureProperDialogDefaultButton(hwndFocus win.HWND) {
 	}
 }
 
-func (pb *PushButton) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (pb *PushButton) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_GETDLGCODE:
-		hwndFocus := win.GetFocus()
+	case user32.WM_GETDLGCODE:
+		hwndFocus := user32.GetFocus()
 		if hwndFocus == pb.hWnd {
 			form := ancestor(pb)
 			if form == nil {
@@ -99,8 +100,8 @@ func (pb *PushButton) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr)
 
 			defBtn := dlg.DefaultButton()
 			if defBtn == pb {
-				pb.setAndClearStyleBits(win.BS_DEFPUSHBUTTON, win.BS_PUSHBUTTON)
-				return win.DLGC_BUTTON | win.DLGC_DEFPUSHBUTTON
+				pb.setAndClearStyleBits(user32.BS_DEFPUSHBUTTON, user32.BS_PUSHBUTTON)
+				return user32.DLGC_BUTTON | user32.DLGC_DEFPUSHBUTTON
 			}
 
 			break
@@ -108,8 +109,8 @@ func (pb *PushButton) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr)
 
 		pb.ensureProperDialogDefaultButton(hwndFocus)
 
-	case win.WM_KILLFOCUS:
-		pb.ensureProperDialogDefaultButton(win.HWND(wParam))
+	case user32.WM_KILLFOCUS:
+		pb.ensureProperDialogDefaultButton(handle.HWND(wParam))
 	}
 
 	return pb.Button.WndProc(hwnd, msg, wParam, lParam)

@@ -4,49 +4,53 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
-	"github.com/lxn/win"
 	"syscall"
+
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/win"
 )
 
 // FontMemResource represents a font resource loaded into memory from
 // the application's resources.
 type FontMemResource struct {
-	hFontResource win.HANDLE
+	hFontResource handle.HANDLE
 }
 
 func newFontMemResource(resourceName *uint16) (*FontMemResource, error) {
-	hModule := win.HMODULE(win.GetModuleHandle(nil))
-	if hModule == win.HMODULE(0) {
+	hModule := kernel32.HMODULE(kernel32.GetModuleHandle(nil))
+	if hModule == kernel32.HMODULE(0) {
 		return nil, lastError("GetModuleHandle")
 	}
 
-	hres := win.FindResource(hModule, resourceName, win.MAKEINTRESOURCE(8) /*RT_FONT*/)
-	if hres == win.HRSRC(0) {
+	hres := kernel32.FindResource(hModule, resourceName, win.MAKEINTRESOURCE(8) /*RT_FONT*/)
+	if hres == kernel32.HRSRC(0) {
 		return nil, lastError("FindResource")
 	}
 
-	size := win.SizeofResource(hModule, hres)
+	size := kernel32.SizeofResource(hModule, hres)
 	if size == 0 {
 		return nil, lastError("SizeofResource")
 	}
 
-	hResLoad := win.LoadResource(hModule, hres)
-	if hResLoad == win.HGLOBAL(0) {
+	hResLoad := kernel32.LoadResource(hModule, hres)
+	if hResLoad == kernel32.HGLOBAL(0) {
 		return nil, lastError("LoadResource")
 	}
 
-	ptr := win.LockResource(hResLoad)
+	ptr := kernel32.LockResource(hResLoad)
 	if ptr == 0 {
 		return nil, lastError("LockResource")
 	}
 
 	numFonts := uint32(0)
-	hFontResource := win.AddFontMemResourceEx(ptr, size, nil, &numFonts)
+	hFontResource := gdi32.AddFontMemResourceEx(ptr, size, nil, &numFonts)
 
-	if hFontResource == win.HANDLE(0) || numFonts == 0 {
+	if hFontResource == handle.HANDLE(0) || numFonts == 0 {
 		return nil, lastError("AddFontMemResource")
 	}
 
@@ -77,7 +81,7 @@ func NewFontMemResourceById(id int) (*FontMemResource, error) {
 // Dispose removes the font resource from memory
 func (fmr *FontMemResource) Dispose() {
 	if fmr.hFontResource != 0 {
-		win.RemoveFontMemResourceEx(fmr.hFontResource)
+		gdi32.RemoveFontMemResourceEx(fmr.hFontResource)
 		fmr.hFontResource = 0
 	}
 }

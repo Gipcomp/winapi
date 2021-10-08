@@ -4,54 +4,57 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/shell32"
+	"github.com/Gipcomp/win32/user32"
 )
 
 var notifyIcons = make(map[*NotifyIcon]bool)
 
-func notifyIconWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) (result uintptr) {
+func notifyIconWndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) (result uintptr) {
 	// Retrieve our *NotifyIcon from the message window.
-	ptr := win.GetWindowLongPtr(hwnd, win.GWLP_USERDATA)
+	ptr := user32.GetWindowLongPtr(hwnd, user32.GWLP_USERDATA)
 	ni := (*NotifyIcon)(unsafe.Pointer(ptr))
 
 	switch lParam {
-	case win.WM_LBUTTONDOWN:
+	case user32.WM_LBUTTONDOWN:
 		ni.publishMouseEvent(&ni.mouseDownPublisher, LeftButton)
 
-	case win.WM_LBUTTONUP:
+	case user32.WM_LBUTTONUP:
 		ni.publishMouseEvent(&ni.mouseUpPublisher, LeftButton)
 
-	case win.WM_RBUTTONDOWN:
+	case user32.WM_RBUTTONDOWN:
 		ni.publishMouseEvent(&ni.mouseDownPublisher, RightButton)
 
-	case win.WM_RBUTTONUP:
+	case user32.WM_RBUTTONUP:
 		ni.publishMouseEvent(&ni.mouseUpPublisher, RightButton)
 
-		win.SendMessage(hwnd, msg, wParam, win.WM_CONTEXTMENU)
+		user32.SendMessage(hwnd, msg, wParam, user32.WM_CONTEXTMENU)
 
-	case win.WM_CONTEXTMENU:
+	case user32.WM_CONTEXTMENU:
 		if ni.contextMenu.Actions().Len() == 0 {
 			break
 		}
 
-		win.SetForegroundWindow(hwnd)
+		user32.SetForegroundWindow(hwnd)
 
-		var p win.POINT
-		if !win.GetCursorPos(&p) {
+		var p gdi32.POINT
+		if !user32.GetCursorPos(&p) {
 			lastError("GetCursorPos")
 		}
 
 		ni.applyDPI()
 
-		actionId := uint16(win.TrackPopupMenuEx(
+		actionId := uint16(user32.TrackPopupMenuEx(
 			ni.contextMenu.hMenu,
-			win.TPM_NOANIMATION|win.TPM_RETURNCMD,
+			user32.TPM_NOANIMATION|user32.TPM_RETURNCMD,
 			p.X,
 			p.Y,
 			hwnd,
@@ -63,17 +66,17 @@ func notifyIconWndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) (resul
 		}
 
 		return 0
-	case win.NIN_BALLOONUSERCLICK:
+	case shell32.NIN_BALLOONUSERCLICK:
 		ni.messageClickedPublisher.Publish()
 	}
 
-	return win.DefWindowProc(hwnd, msg, wParam, lParam)
+	return user32.DefWindowProc(hwnd, msg, wParam, lParam)
 }
 
 // NotifyIcon represents an icon in the taskbar notification area.
 type NotifyIcon struct {
 	id                      uint32
-	hWnd                    win.HWND
+	hWnd                    handle.HWND
 	lastDPI                 int
 	contextMenu             *Menu
 	icon                    Image
@@ -90,23 +93,23 @@ type NotifyIcon struct {
 func NewNotifyIcon(form Form) (*NotifyIcon, error) {
 	fb := form.AsFormBase()
 	// Add our notify icon to the status area and make sure it is hidden.
-	nid := win.NOTIFYICONDATA{
+	nid := shell32.NOTIFYICONDATA{
 		HWnd:             fb.hWnd,
-		UFlags:           win.NIF_MESSAGE | win.NIF_STATE,
-		DwState:          win.NIS_HIDDEN,
-		DwStateMask:      win.NIS_HIDDEN,
+		UFlags:           shell32.NIF_MESSAGE | shell32.NIF_STATE,
+		DwState:          shell32.NIS_HIDDEN,
+		DwStateMask:      shell32.NIS_HIDDEN,
 		UCallbackMessage: notifyIconMessageId,
 	}
-	nid.CbSize = uint32(unsafe.Sizeof(nid) - unsafe.Sizeof(win.HICON(0)))
+	nid.CbSize = uint32(unsafe.Sizeof(nid) - unsafe.Sizeof(user32.HICON(0)))
 
-	if !win.Shell_NotifyIcon(win.NIM_ADD, &nid) {
+	if !shell32.Shell_NotifyIcon(shell32.NIM_ADD, &nid) {
 		return nil, newError("Shell_NotifyIcon")
 	}
 
 	// We want XP-compatible message behavior.
-	nid.UVersion = win.NOTIFYICON_VERSION
+	nid.UVersion = shell32.NOTIFYICON_VERSION
 
-	if !win.Shell_NotifyIcon(win.NIM_SETVERSION, &nid) {
+	if !shell32.Shell_NotifyIcon(shell32.NIM_SETVERSION, &nid) {
 		return nil, newError("Shell_NotifyIcon")
 	}
 
@@ -126,35 +129,43 @@ func NewNotifyIcon(form Form) (*NotifyIcon, error) {
 	menu.getDPI = ni.DPI
 
 	// Set our *NotifyIcon as user data for the message window.
-	win.SetWindowLongPtr(fb.hWnd, win.GWLP_USERDATA, uintptr(unsafe.Pointer(ni)))
+	user32.SetWindowLongPtr(fb.hWnd, user32.GWLP_USERDATA, uintptr(unsafe.Pointer(ni)))
 
 	notifyIcons[ni] = true
 	return ni, nil
 }
 
 func (ni *NotifyIcon) DPI() int {
-	fakeWb := WindowBase{hWnd: win.FindWindow(syscall.StringToUTF16Ptr("Shell_TrayWnd"), syscall.StringToUTF16Ptr(""))}
+	shellTrayWndPtr, err := syscall.UTF16PtrFromString("Shell_TrayWnd")
+	if err != nil {
+		newError(err.Error())
+	}
+	emptyPtr, err := syscall.UTF16PtrFromString("")
+	if err != nil {
+		newError(err.Error())
+	}
+	fakeWb := WindowBase{hWnd: user32.FindWindow(shellTrayWndPtr, emptyPtr)}
 	return fakeWb.DPI()
 }
 
 func (ni *NotifyIcon) readdToTaskbar() error {
-	nid := win.NOTIFYICONDATA{
+	nid := shell32.NOTIFYICONDATA{
 		HWnd:             ni.hWnd,
-		UFlags:           win.NIF_MESSAGE | win.NIF_STATE,
-		DwState:          win.NIS_HIDDEN,
-		DwStateMask:      win.NIS_HIDDEN,
+		UFlags:           shell32.NIF_MESSAGE | shell32.NIF_STATE,
+		DwState:          shell32.NIS_HIDDEN,
+		DwStateMask:      shell32.NIS_HIDDEN,
 		UCallbackMessage: notifyIconMessageId,
 	}
-	nid.CbSize = uint32(unsafe.Sizeof(nid) - unsafe.Sizeof(win.HICON(0)))
+	nid.CbSize = uint32(unsafe.Sizeof(nid) - unsafe.Sizeof(user32.HICON(0)))
 
-	if !win.Shell_NotifyIcon(win.NIM_ADD, &nid) {
+	if !shell32.Shell_NotifyIcon(shell32.NIM_ADD, &nid) {
 		return newError("Shell_NotifyIcon")
 	}
 
 	// We want XP-compatible message behavior.
-	nid.UVersion = win.NOTIFYICON_VERSION
+	nid.UVersion = shell32.NOTIFYICON_VERSION
 
-	if !win.Shell_NotifyIcon(win.NIM_SETVERSION, &nid) {
+	if !shell32.Shell_NotifyIcon(shell32.NIM_SETVERSION, &nid) {
 		return newError("Shell_NotifyIcon")
 	}
 
@@ -197,12 +208,12 @@ func (ni *NotifyIcon) applyDPI() {
 	}
 }
 
-func (ni *NotifyIcon) notifyIconData() *win.NOTIFYICONDATA {
-	nid := &win.NOTIFYICONDATA{
+func (ni *NotifyIcon) notifyIconData() *shell32.NOTIFYICONDATA {
+	nid := &shell32.NOTIFYICONDATA{
 		UID:  ni.id,
 		HWnd: ni.hWnd,
 	}
-	nid.CbSize = uint32(unsafe.Sizeof(*nid) - unsafe.Sizeof(win.HICON(0)))
+	nid.CbSize = uint32(unsafe.Sizeof(*nid) - unsafe.Sizeof(user32.HICON(0)))
 
 	return nid
 }
@@ -219,7 +230,7 @@ func (ni *NotifyIcon) Dispose() error {
 
 	nid := ni.notifyIconData()
 
-	if !win.Shell_NotifyIcon(win.NIM_DELETE, nid) {
+	if !shell32.Shell_NotifyIcon(shell32.NIM_DELETE, nid) {
 		return newError("Shell_NotifyIcon")
 	}
 
@@ -230,15 +241,15 @@ func (ni *NotifyIcon) Dispose() error {
 
 func (ni *NotifyIcon) showMessage(title, info string, iconType uint32, icon Image) error {
 	nid := ni.notifyIconData()
-	nid.UFlags = win.NIF_INFO
+	nid.UFlags = shell32.NIF_INFO
 	nid.DwInfoFlags = iconType
 	var oldIcon Image
-	if iconType == win.NIIF_USER && icon != nil {
+	if iconType == shell32.NIIF_USER && icon != nil {
 		oldIcon = ni.icon
 		if err := ni.setNIDIcon(nid, icon); err != nil {
 			return err
 		}
-		nid.UFlags |= win.NIF_ICON
+		nid.UFlags |= shell32.NIF_ICON
 	}
 	if title16, err := syscall.UTF16FromString(title); err == nil {
 		copy(nid.SzInfoTitle[:], title16)
@@ -246,7 +257,7 @@ func (ni *NotifyIcon) showMessage(title, info string, iconType uint32, icon Imag
 	if info16, err := syscall.UTF16FromString(info); err == nil {
 		copy(nid.SzInfo[:], info16)
 	}
-	if !win.Shell_NotifyIcon(win.NIM_MODIFY, nid) {
+	if !shell32.Shell_NotifyIcon(shell32.NIM_MODIFY, nid) {
 		return newError("Shell_NotifyIcon")
 	}
 	if oldIcon != nil {
@@ -261,28 +272,28 @@ func (ni *NotifyIcon) showMessage(title, info string, iconType uint32, icon Imag
 //
 // The NotifyIcon must be visible before calling this method.
 func (ni *NotifyIcon) ShowMessage(title, info string) error {
-	return ni.showMessage(title, info, win.NIIF_NONE, nil)
+	return ni.showMessage(title, info, shell32.NIIF_NONE, nil)
 }
 
 // ShowInfo displays an info message balloon above the NotifyIcon.
 //
 // The NotifyIcon must be visible before calling this method.
 func (ni *NotifyIcon) ShowInfo(title, info string) error {
-	return ni.showMessage(title, info, win.NIIF_INFO, nil)
+	return ni.showMessage(title, info, shell32.NIIF_INFO, nil)
 }
 
 // ShowWarning displays a warning message balloon above the NotifyIcon.
 //
 // The NotifyIcon must be visible before calling this method.
 func (ni *NotifyIcon) ShowWarning(title, info string) error {
-	return ni.showMessage(title, info, win.NIIF_WARNING, nil)
+	return ni.showMessage(title, info, shell32.NIIF_WARNING, nil)
 }
 
 // ShowError displays an error message balloon above the NotifyIcon.
 //
 // The NotifyIcon must be visible before calling this method.
 func (ni *NotifyIcon) ShowError(title, info string) error {
-	return ni.showMessage(title, info, win.NIIF_ERROR, nil)
+	return ni.showMessage(title, info, shell32.NIIF_ERROR, nil)
 }
 
 // ShowCustom displays a custom icon message balloon above the NotifyIcon.
@@ -290,7 +301,7 @@ func (ni *NotifyIcon) ShowError(title, info string) error {
 //
 // The NotifyIcon must be visible before calling this method.
 func (ni *NotifyIcon) ShowCustom(title, info string, icon Image) error {
-	return ni.showMessage(title, info, win.NIIF_USER, icon)
+	return ni.showMessage(title, info, shell32.NIIF_USER, icon)
 }
 
 // ContextMenu returns the context menu of the NotifyIcon.
@@ -310,7 +321,7 @@ func (ni *NotifyIcon) SetIcon(icon Image) error {
 	}
 
 	nid := ni.notifyIconData()
-	nid.UFlags = win.NIF_ICON
+	nid.UFlags = shell32.NIF_ICON
 	if icon == nil {
 		nid.HIcon = 0
 	} else {
@@ -319,7 +330,7 @@ func (ni *NotifyIcon) SetIcon(icon Image) error {
 		}
 	}
 
-	if !win.Shell_NotifyIcon(win.NIM_MODIFY, nid) {
+	if !shell32.Shell_NotifyIcon(shell32.NIM_MODIFY, nid) {
 		return newError("Shell_NotifyIcon")
 	}
 
@@ -328,7 +339,7 @@ func (ni *NotifyIcon) SetIcon(icon Image) error {
 	return nil
 }
 
-func (ni *NotifyIcon) setNIDIcon(nid *win.NOTIFYICONDATA, icon Image) error {
+func (ni *NotifyIcon) setNIDIcon(nid *shell32.NOTIFYICONDATA, icon Image) error {
 	dpi := ni.DPI()
 	ic, err := iconCache.Icon(icon, dpi)
 	if err != nil {
@@ -351,10 +362,14 @@ func (ni *NotifyIcon) SetToolTip(toolTip string) error {
 	}
 
 	nid := ni.notifyIconData()
-	nid.UFlags = win.NIF_TIP
-	copy(nid.SzTip[:], syscall.StringToUTF16(toolTip))
+	nid.UFlags = shell32.NIF_TIP
+	cp, err := syscall.UTF16FromString(toolTip)
+	if err != nil {
+		newError(err.Error())
+	}
+	copy(nid.SzTip[:], cp)
 
-	if !win.Shell_NotifyIcon(win.NIM_MODIFY, nid) {
+	if !shell32.Shell_NotifyIcon(shell32.NIM_MODIFY, nid) {
 		return newError("Shell_NotifyIcon")
 	}
 
@@ -375,13 +390,13 @@ func (ni *NotifyIcon) SetVisible(visible bool) error {
 	}
 
 	nid := ni.notifyIconData()
-	nid.UFlags = win.NIF_STATE
-	nid.DwStateMask = win.NIS_HIDDEN
+	nid.UFlags = shell32.NIF_STATE
+	nid.DwStateMask = shell32.NIS_HIDDEN
 	if !visible {
-		nid.DwState = win.NIS_HIDDEN
+		nid.DwState = shell32.NIS_HIDDEN
 	}
 
-	if !win.Shell_NotifyIcon(win.NIM_MODIFY, nid) {
+	if !shell32.Shell_NotifyIcon(shell32.NIM_MODIFY, nid) {
 		return newError("Shell_NotifyIcon")
 	}
 
@@ -391,8 +406,8 @@ func (ni *NotifyIcon) SetVisible(visible bool) error {
 }
 
 func (ni *NotifyIcon) publishMouseEvent(publisher *MouseEventPublisher, button MouseButton) {
-	var p win.POINT
-	if !win.GetCursorPos(&p) {
+	var p gdi32.POINT
+	if !user32.GetCursorPos(&p) {
 		lastError("GetCursorPos")
 	}
 

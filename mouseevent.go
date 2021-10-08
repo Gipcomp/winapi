@@ -4,18 +4,16 @@
 
 // +build windows
 
-package walk
+package winapi
 
-import (
-	"github.com/lxn/win"
-)
+import "github.com/Gipcomp/win32/user32"
 
 type MouseButton int
 
 const (
-	LeftButton   MouseButton = win.MK_LBUTTON
-	RightButton  MouseButton = win.MK_RBUTTON
-	MiddleButton MouseButton = win.MK_MBUTTON
+	LeftButton   MouseButton = user32.MK_LBUTTON
+	RightButton  MouseButton = user32.MK_RBUTTON
+	MiddleButton MouseButton = user32.MK_MBUTTON
 )
 
 type mouseEventHandlerInfo struct {

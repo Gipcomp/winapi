@@ -4,12 +4,16 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/uxtheme"
+	"github.com/Gipcomp/win32/win"
 )
 
 // BindingValueProvider is the interface that a model must implement to support
@@ -319,7 +323,7 @@ type CellStyle struct {
 	row             int
 	col             int
 	bounds          Rectangle // in native pixels
-	hdc             win.HDC
+	hdc             gdi32.HDC
 	dpi             int
 	canvas          *Canvas
 	BackgroundColor Color
@@ -399,12 +403,12 @@ type ListItemStyle struct {
 	Font               *Font
 	index              int
 	hoverIndex         int
-	rc                 win.RECT
+	rc                 gdi32.RECT
 	bounds             Rectangle // in native pixels
 	state              uint32
-	hTheme             win.HTHEME
-	hwnd               win.HWND
-	hdc                win.HDC
+	hTheme             uxtheme.HTHEME
+	hwnd               handle.HWND
+	hdc                gdi32.HDC
 	dpi                int
 	canvas             *Canvas
 	highContrastActive bool
@@ -444,8 +448,8 @@ func (lis *ListItemStyle) DrawBackground() error {
 
 	stateID := lis.stateID()
 
-	if lis.hTheme != 0 && stateID != win.LISS_NORMAL {
-		if win.FAILED(win.DrawThemeBackground(lis.hTheme, lis.hdc, win.LVP_LISTITEM, stateID, &lis.rc, nil)) {
+	if lis.hTheme != 0 && stateID != uxtheme.LISS_NORMAL {
+		if win.FAILED(uxtheme.DrawThemeBackground(lis.hTheme, lis.hdc, uxtheme.LVP_LISTITEM, stateID, &lis.rc, nil)) {
 			return newError("DrawThemeBackground failed")
 		}
 	} else {
@@ -459,7 +463,7 @@ func (lis *ListItemStyle) DrawBackground() error {
 			return err
 		}
 
-		if lis.highContrastActive && (lis.index == lis.hoverIndex || stateID != win.LISS_NORMAL) {
+		if lis.highContrastActive && (lis.index == lis.hoverIndex || stateID != uxtheme.LISS_NORMAL) {
 			pen, err := NewCosmeticPen(PenSolid, lis.LineColor)
 			if err != nil {
 				return err
@@ -479,12 +483,15 @@ func (lis *ListItemStyle) DrawBackground() error {
 func (lis *ListItemStyle) DrawText(text string, bounds Rectangle, format DrawTextFormat) error {
 	if lis.hTheme != 0 && lis.TextColor == lis.defaultTextColor {
 		if lis.Font != nil {
-			hFontOld := win.SelectObject(lis.hdc, win.HGDIOBJ(lis.Font.handleForDPI(lis.dpi)))
-			defer win.SelectObject(lis.hdc, hFontOld)
+			hFontOld := gdi32.SelectObject(lis.hdc, gdi32.HGDIOBJ(lis.Font.handleForDPI(lis.dpi)))
+			defer gdi32.SelectObject(lis.hdc, hFontOld)
 		}
 		rc := bounds.toRECT()
-
-		if win.FAILED(win.DrawThemeTextEx(lis.hTheme, lis.hdc, win.LVP_LISTITEM, lis.stateID(), syscall.StringToUTF16Ptr(text), int32(len(([]rune)(text))), uint32(format), &rc, nil)) {
+		strPtr, err := syscall.UTF16PtrFromString(text)
+		if err != nil {
+			return err
+		}
+		if win.FAILED(uxtheme.DrawThemeTextEx(lis.hTheme, lis.hdc, uxtheme.LVP_LISTITEM, lis.stateID(), strPtr, int32(len(([]rune)(text))), uint32(format), &rc, nil)) {
 			return newError("DrawThemeTextEx failed")
 		}
 	} else {
@@ -499,21 +506,21 @@ func (lis *ListItemStyle) DrawText(text string, bounds Rectangle, format DrawTex
 }
 
 func (lis *ListItemStyle) stateID() int32 {
-	if lis.state&win.ODS_CHECKED != 0 {
-		if win.GetFocus() == lis.hwnd {
+	if lis.state&user32.ODS_CHECKED != 0 {
+		if user32.GetFocus() == lis.hwnd {
 			if lis.index == lis.hoverIndex {
-				return win.LISS_HOTSELECTED
+				return uxtheme.LISS_HOTSELECTED
 			} else {
-				return win.LISS_SELECTED
+				return uxtheme.LISS_SELECTED
 			}
 		} else {
-			return win.LISS_SELECTEDNOTFOCUS
+			return uxtheme.LISS_SELECTEDNOTFOCUS
 		}
 	} else if lis.index == lis.hoverIndex {
-		return win.LISS_HOT
+		return uxtheme.LISS_HOT
 	}
 
-	return win.LISS_NORMAL
+	return uxtheme.LISS_NORMAL
 }
 
 // ItemChecker is the interface that a model must implement to support check

@@ -4,14 +4,15 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"runtime"
 	"sync"
 	"time"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/win32/user32"
 )
 
 type Settings interface {
@@ -90,7 +91,7 @@ func (app *Application) Exit(exitCode int) {
 	defer app.mutex.Unlock()
 	app.exiting = true
 	app.exitCode = exitCode
-	win.PostQuitMessage(int32(exitCode))
+	user32.PostQuitMessage(int32(exitCode))
 }
 
 func (app *Application) ExitCode() int {
@@ -112,7 +113,7 @@ func (app *Application) Panicking() *ErrorEvent {
 func (app *Application) ActiveForm() Form {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-	tid := win.GetCurrentThreadId()
+	tid := kernel32.GetCurrentThreadId()
 	group := wgm.Group(tid)
 	if group == nil {
 		return nil

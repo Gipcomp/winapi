@@ -4,17 +4,20 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/comctl32"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/shell32"
+	"github.com/Gipcomp/win32/user32"
 )
 
 type ImageList struct {
-	hIml                     win.HIMAGELIST
+	hIml                     comctl32.HIMAGELIST
 	dpi                      int
 	maskColor                Color
 	imageSize96dpi           Size
@@ -39,10 +42,10 @@ func NewImageList(imageSize Size, maskColor Color) (*ImageList, error) {
 // NewImageListForDPI creates an empty image list for image size at given DPI. imageSize is
 // specified in native pixels.
 func NewImageListForDPI(imageSize Size, maskColor Color, dpi int) (*ImageList, error) {
-	hIml := win.ImageList_Create(
+	hIml := comctl32.ImageList_Create(
 		int32(imageSize.Width),
 		int32(imageSize.Height),
-		win.ILC_MASK|win.ILC_COLOR32,
+		comctl32.ILC_MASK|comctl32.ILC_COLOR32,
 		8,
 		8)
 	if hIml == 0 {
@@ -60,7 +63,7 @@ func NewImageListForDPI(imageSize Size, maskColor Color, dpi int) (*ImageList, e
 	}, nil
 }
 
-func (il *ImageList) Handle() win.HIMAGELIST {
+func (il *ImageList) Handle() comctl32.HIMAGELIST {
 	return il.hIml
 }
 
@@ -75,12 +78,12 @@ func (il *ImageList) Add(bitmap, maskBitmap *Bitmap) (int, error) {
 		return index, nil
 	}
 
-	var maskHandle win.HBITMAP
+	var maskHandle gdi32.HBITMAP
 	if maskBitmap != nil {
 		maskHandle = maskBitmap.handle()
 	}
 
-	index := int(win.ImageList_Add(il.hIml, bitmap.handle(), maskHandle))
+	index := int(comctl32.ImageList_Add(il.hIml, bitmap.handle(), maskHandle))
 	if index == -1 {
 		return 0, newError("ImageList_Add failed")
 	}
@@ -99,10 +102,10 @@ func (il *ImageList) AddMasked(bitmap *Bitmap) (int32, error) {
 		return int32(index), nil
 	}
 
-	index := win.ImageList_AddMasked(
+	index := comctl32.ImageList_AddMasked(
 		il.hIml,
 		bitmap.handle(),
-		win.COLORREF(il.maskColor))
+		gdi32.COLORREF(il.maskColor))
 	if index == -1 {
 		return 0, newError("ImageList_AddMasked failed")
 	}
@@ -121,7 +124,7 @@ func (il *ImageList) AddIcon(icon *Icon) (int32, error) {
 		return index, nil
 	}
 
-	index := win.ImageList_ReplaceIcon(il.hIml, -1, icon.handleForDPI(il.dpi))
+	index := comctl32.ImageList_ReplaceIcon(il.hIml, -1, icon.handleForDPI(il.dpi))
 	if index == -1 {
 		return 0, newError("ImageList_ReplaceIcon failed")
 	}
@@ -152,7 +155,7 @@ func (il *ImageList) AddImage(image interface{}) (int32, error) {
 }
 
 func (il *ImageList) DrawPixels(canvas *Canvas, index int, bounds Rectangle) error {
-	if !win.ImageList_DrawEx(il.hIml, int32(index), canvas.hdc, int32(bounds.X), int32(bounds.Y), int32(bounds.Width), int32(bounds.Height), win.CLR_DEFAULT, win.CLR_DEFAULT, win.ILD_NORMAL) {
+	if !comctl32.ImageList_DrawEx(il.hIml, int32(index), canvas.hdc, int32(bounds.X), int32(bounds.Y), int32(bounds.Width), int32(bounds.Height), gdi32.CLR_DEFAULT, gdi32.CLR_DEFAULT, comctl32.ILD_NORMAL) {
 		return newError("ImageList_DrawEx")
 	}
 
@@ -161,7 +164,7 @@ func (il *ImageList) DrawPixels(canvas *Canvas, index int, bounds Rectangle) err
 
 func (il *ImageList) Dispose() {
 	if il.hIml != 0 {
-		win.ImageList_Destroy(il.hIml)
+		comctl32.ImageList_Destroy(il.hIml)
 		il.hIml = 0
 	}
 }
@@ -170,7 +173,7 @@ func (il *ImageList) MaskColor() Color {
 	return il.maskColor
 }
 
-func imageListForImage(image interface{}, dpi int) (hIml win.HIMAGELIST, isSysIml bool, err error) {
+func imageListForImage(image interface{}, dpi int) (hIml comctl32.HIMAGELIST, isSysIml bool, err error) {
 	if name, ok := image.(string); ok {
 		if img, err := Resources.Image(name); err == nil {
 			image = img
@@ -181,10 +184,10 @@ func imageListForImage(image interface{}, dpi int) (hIml win.HIMAGELIST, isSysIm
 		_, hIml = iconIndexAndHImlForFilePath(filePath)
 		isSysIml = hIml != 0
 	} else {
-		w := int32(win.GetSystemMetricsForDpi(win.SM_CXSMICON, uint32(dpi)))
-		h := int32(win.GetSystemMetricsForDpi(win.SM_CYSMICON, uint32(dpi)))
+		w := int32(user32.GetSystemMetricsForDpi(user32.SM_CXSMICON, uint32(dpi)))
+		h := int32(user32.GetSystemMetricsForDpi(user32.SM_CYSMICON, uint32(dpi)))
 
-		hIml = win.ImageList_Create(w, h, win.ILC_MASK|win.ILC_COLOR32, 8, 8)
+		hIml = comctl32.ImageList_Create(w, h, comctl32.ILC_MASK|comctl32.ILC_COLOR32, 8, 8)
 		if hIml == 0 {
 			return 0, false, newError("ImageList_Create failed")
 		}
@@ -193,15 +196,18 @@ func imageListForImage(image interface{}, dpi int) (hIml win.HIMAGELIST, isSysIm
 	return
 }
 
-func iconIndexAndHImlForFilePath(filePath string) (int32, win.HIMAGELIST) {
-	var shfi win.SHFILEINFO
-
-	if hIml := win.HIMAGELIST(win.SHGetFileInfo(
-		syscall.StringToUTF16Ptr(filePath),
+func iconIndexAndHImlForFilePath(filePath string) (int32, comctl32.HIMAGELIST) {
+	var shfi shell32.SHFILEINFO
+	strPtr, err := syscall.UTF16PtrFromString(filePath)
+	if err != nil {
+		newError(err.Error())
+	}
+	if hIml := comctl32.HIMAGELIST(shell32.SHGetFileInfo(
+		strPtr,
 		0,
 		&shfi,
 		uint32(unsafe.Sizeof(shfi)),
-		win.SHGFI_SYSICONINDEX|win.SHGFI_SMALLICON)); hIml != 0 {
+		shell32.SHGFI_SYSICONINDEX|shell32.SHGFI_SMALLICON)); hIml != 0 {
 
 		return shfi.IIcon, hIml
 	}
@@ -209,7 +215,7 @@ func iconIndexAndHImlForFilePath(filePath string) (int32, win.HIMAGELIST) {
 	return -1, 0
 }
 
-func imageIndexMaybeAdd(image interface{}, hIml win.HIMAGELIST, isSysIml bool, imageUintptr2Index map[uintptr]int32, filePath2IconIndex map[string]int32, dpi int) int32 {
+func imageIndexMaybeAdd(image interface{}, hIml comctl32.HIMAGELIST, isSysIml bool, imageUintptr2Index map[uintptr]int32, filePath2IconIndex map[string]int32, dpi int) int32 {
 	if !isSysIml {
 		return imageIndexAddIfNotExists(image, hIml, imageUintptr2Index, dpi)
 	} else if filePath, ok := image.(string); ok {
@@ -226,7 +232,7 @@ func imageIndexMaybeAdd(image interface{}, hIml win.HIMAGELIST, isSysIml bool, i
 	return -1
 }
 
-func imageIndexAddIfNotExists(image interface{}, hIml win.HIMAGELIST, imageUintptr2Index map[uintptr]int32, dpi int) int32 {
+func imageIndexAddIfNotExists(image interface{}, hIml comctl32.HIMAGELIST, imageUintptr2Index map[uintptr]int32, dpi int) int32 {
 	imageIndex := int32(-1)
 
 	if image != nil {
@@ -253,10 +259,10 @@ func imageIndexAddIfNotExists(image interface{}, hIml win.HIMAGELIST, imageUintp
 
 		switch img := image.(type) {
 		case *Bitmap:
-			imageIndex = win.ImageList_AddMasked(hIml, img.hBmp, 0)
+			imageIndex = comctl32.ImageList_AddMasked(hIml, img.hBmp, 0)
 
 		case *Icon:
-			imageIndex = win.ImageList_ReplaceIcon(hIml, -1, img.handleForDPI(dpi))
+			imageIndex = comctl32.ImageList_ReplaceIcon(hIml, -1, img.handleForDPI(dpi))
 		}
 
 		if imageIndex > -1 {

@@ -4,7 +4,7 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"bytes"
@@ -13,7 +13,8 @@ import (
 	"strings"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
 )
 
 const splitterWindowClass = `\o/ Walk_Splitter_Class \o/`
@@ -24,7 +25,7 @@ func init() {
 	AppendToWalkInit(func() {
 		MustRegisterWindowClass(splitterWindowClass)
 
-		splitterHandleDraggingBrush, _ = NewSolidColorBrush(Color(win.GetSysColor(win.COLOR_BTNSHADOW)))
+		splitterHandleDraggingBrush, _ = NewSolidColorBrush(Color(user32.GetSysColor(user32.COLOR_BTNSHADOW)))
 		splitterHandleDraggingBrush.wb2info = map[*WindowBase]*windowBrushInfo{nil: nil}
 	})
 }
@@ -53,8 +54,8 @@ func newSplitter(parent Container, orientation Orientation) (*Splitter, error) {
 		s,
 		parent,
 		splitterWindowClass,
-		win.WS_VISIBLE,
-		win.WS_EX_CONTROLPARENT); err != nil {
+		user32.WS_VISIBLE,
+		user32.WS_EX_CONTROLPARENT); err != nil {
 		return nil, err
 	}
 
@@ -163,7 +164,6 @@ func (s *Splitter) updateMarginsForFocusEffect() {
 
 			default:
 				marginsNeeded = true
-				break
 			}
 		}
 
@@ -315,12 +315,12 @@ func (s *Splitter) SetFixed(widget Widget, fixed bool) error {
 	return nil
 }
 
-func (s *Splitter) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (s *Splitter) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_WINDOWPOSCHANGED:
-		wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
+	case user32.WM_WINDOWPOSCHANGED:
+		wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
 
-		if wp.Flags&win.SWP_NOSIZE != 0 {
+		if wp.Flags&user32.SWP_NOSIZE != 0 {
 			break
 		}
 
@@ -466,7 +466,7 @@ func (s *Splitter) onInsertedWidget(index int, widget Widget) (err error) {
 							rc.Top -= int32(bp.Y)
 							rc.Bottom -= int32(bp.Y)
 						}
-						win.InvalidateRect(prev.Handle(), &rc, true)
+						user32.InvalidateRect(prev.Handle(), &rc, true)
 
 						rc = bh.toRECT()
 						if s.Orientation() == Horizontal {
@@ -476,7 +476,7 @@ func (s *Splitter) onInsertedWidget(index int, widget Widget) (err error) {
 							rc.Top -= int32(bn.Y)
 							rc.Bottom -= int32(bn.Y)
 						}
-						win.InvalidateRect(next.Handle(), &rc, true)
+						user32.InvalidateRect(next.Handle(), &rc, true)
 
 						s.draggedHandle.Invalidate()
 					})

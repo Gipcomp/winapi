@@ -4,10 +4,11 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
 )
 
 const splitterHandleWindowClass = `\o/ Walk_SplitterHandle_Class \o/`
@@ -34,33 +35,33 @@ func newSplitterHandle(splitter *Splitter) (*splitterHandle, error) {
 		sh,
 		splitter,
 		splitterHandleWindowClass,
-		win.WS_CHILD|win.WS_VISIBLE,
+		user32.WS_CHILD|user32.WS_VISIBLE,
 		0); err != nil {
 		return nil, err
 	}
 
 	sh.SetBackground(NullBrush())
 
-	if err := sh.setAndClearStyleBits(0, win.WS_CLIPSIBLINGS); err != nil {
+	if err := sh.setAndClearStyleBits(0, user32.WS_CLIPSIBLINGS); err != nil {
 		return nil, err
 	}
 
 	return sh, nil
 }
 
-func (sh *splitterHandle) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (sh *splitterHandle) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_ERASEBKGND:
+	case user32.WM_ERASEBKGND:
 		if sh.Background() == nullBrushSingleton {
 			return 1
 		}
 
-	case win.WM_PAINT:
+	case user32.WM_PAINT:
 		if sh.Background() == nullBrushSingleton {
-			var ps win.PAINTSTRUCT
+			var ps user32.PAINTSTRUCT
 
-			win.BeginPaint(hwnd, &ps)
-			defer win.EndPaint(hwnd, &ps)
+			user32.BeginPaint(hwnd, &ps)
+			defer user32.EndPaint(hwnd, &ps)
 
 			return 0
 		}
@@ -100,7 +101,7 @@ func (li *splitterHandleLayoutItem) LayoutFlags() LayoutFlags {
 
 func (li *splitterHandleLayoutItem) IdealSize() Size {
 	var size Size
-	dpi := int(win.GetDpiForWindow(li.handle))
+	dpi := int(user32.GetDpiForWindow(li.handle))
 
 	if li.orientation == Horizontal {
 		size.Width = IntFrom96DPI(li.handleWidth, dpi)

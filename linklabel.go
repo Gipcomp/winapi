@@ -4,13 +4,18 @@
 
 // +build windows
 
-package walk
+package winapi
 
 import (
 	"syscall"
 	"unsafe"
 
-	"github.com/lxn/win"
+	"github.com/Gipcomp/win32/comctl32"
+	"github.com/Gipcomp/win32/commctrl"
+	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/win32/win"
 )
 
 type LinkLabel struct {
@@ -26,7 +31,7 @@ func NewLinkLabel(parent Container) (*LinkLabel, error) {
 		ll,
 		parent,
 		"SysLink",
-		win.WS_TABSTOP|win.WS_VISIBLE,
+		user32.WS_TABSTOP|user32.WS_VISIBLE,
 		0); err != nil {
 		return nil, err
 	}
@@ -67,13 +72,13 @@ func (ll *LinkLabel) LinkActivated() *LinkLabelLinkEvent {
 	return ll.linkActivatedPublisher.Event()
 }
 
-func (ll *LinkLabel) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) uintptr {
+func (ll *LinkLabel) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) uintptr {
 	switch msg {
-	case win.WM_NOTIFY:
-		nml := (*win.NMLINK)(unsafe.Pointer(lParam))
+	case user32.WM_NOTIFY:
+		nml := (*commctrl.NMLINK)(unsafe.Pointer(lParam))
 
 		switch nml.Hdr.Code {
-		case win.NM_CLICK, win.NM_RETURN:
+		case comctl32.NM_CLICK, comctl32.NM_RETURN:
 			link := &LinkLabelLink{
 				ll:    ll,
 				index: int(nml.Item.ILink),
@@ -84,16 +89,16 @@ func (ll *LinkLabel) WndProc(hwnd win.HWND, msg uint32, wParam, lParam uintptr) 
 			ll.linkActivatedPublisher.Publish(link)
 		}
 
-	case win.WM_KILLFOCUS:
-		ll.ensureStyleBits(win.WS_TABSTOP, true)
+	case user32.WM_KILLFOCUS:
+		ll.ensureStyleBits(user32.WS_TABSTOP, true)
 
-	case win.WM_SETTEXT:
+	case user32.WM_SETTEXT:
 		ll.textChangedPublisher.Publish()
 
-	case win.WM_WINDOWPOSCHANGED:
-		wp := (*win.WINDOWPOS)(unsafe.Pointer(lParam))
+	case user32.WM_WINDOWPOSCHANGED:
+		wp := (*user32.WINDOWPOS)(unsafe.Pointer(lParam))
 
-		if wp.Flags&win.SWP_NOSIZE != 0 {
+		if wp.Flags&user32.SWP_NOSIZE != 0 {
 			break
 		}
 
@@ -161,37 +166,37 @@ func (lll *LinkLabelLink) URL() string {
 }
 
 func (lll *LinkLabelLink) Enabled() (bool, error) {
-	return lll.hasState(win.LIS_ENABLED)
+	return lll.hasState(commctrl.LIS_ENABLED)
 }
 
 func (lll *LinkLabelLink) SetEnabled(enabled bool) error {
-	return lll.setState(win.LIS_ENABLED, enabled)
+	return lll.setState(commctrl.LIS_ENABLED, enabled)
 }
 
 func (lll *LinkLabelLink) Focused() (bool, error) {
-	return lll.hasState(win.LIS_FOCUSED)
+	return lll.hasState(commctrl.LIS_FOCUSED)
 }
 
 func (lll *LinkLabelLink) SetFocused(focused bool) error {
-	return lll.setState(win.LIS_FOCUSED, focused)
+	return lll.setState(commctrl.LIS_FOCUSED, focused)
 }
 
 func (lll *LinkLabelLink) Visited() (bool, error) {
-	return lll.hasState(win.LIS_VISITED)
+	return lll.hasState(commctrl.LIS_VISITED)
 }
 
 func (lll *LinkLabelLink) SetVisited(visited bool) error {
-	return lll.setState(win.LIS_VISITED, visited)
+	return lll.setState(commctrl.LIS_VISITED, visited)
 }
 
 func (lll *LinkLabelLink) hasState(state uint32) (bool, error) {
-	li := win.LITEM{
+	li := commctrl.LITEM{
 		ILink:     int32(lll.index),
-		Mask:      win.LIF_ITEMINDEX | win.LIF_STATE,
+		Mask:      commctrl.LIF_ITEMINDEX | commctrl.LIF_STATE,
 		StateMask: state,
 	}
 
-	if win.TRUE != lll.ll.SendMessage(win.LM_GETITEM, 0, uintptr(unsafe.Pointer(&li))) {
+	if win.TRUE != lll.ll.SendMessage(commctrl.LM_GETITEM, 0, uintptr(unsafe.Pointer(&li))) {
 		return false, newError("LM_GETITEM")
 	}
 
@@ -199,8 +204,8 @@ func (lll *LinkLabelLink) hasState(state uint32) (bool, error) {
 }
 
 func (lll *LinkLabelLink) setState(state uint32, set bool) error {
-	li := win.LITEM{
-		Mask:      win.LIF_STATE,
+	li := commctrl.LITEM{
+		Mask:      commctrl.LIF_STATE,
 		StateMask: state,
 	}
 
@@ -208,10 +213,10 @@ func (lll *LinkLabelLink) setState(state uint32, set bool) error {
 		li.State = state
 	}
 
-	li.Mask |= win.LIF_ITEMINDEX
+	li.Mask |= commctrl.LIF_ITEMINDEX
 	li.ILink = int32(lll.index)
 
-	if win.TRUE != lll.ll.SendMessage(win.LM_SETITEM, 0, uintptr(unsafe.Pointer(&li))) {
+	if win.TRUE != lll.ll.SendMessage(commctrl.LM_SETITEM, 0, uintptr(unsafe.Pointer(&li))) {
 		return newError("LM_SETITEM")
 	}
 
@@ -219,8 +224,8 @@ func (lll *LinkLabelLink) setState(state uint32, set bool) error {
 }
 
 func (ll *LinkLabel) CreateLayoutItem(ctx *LayoutContext) LayoutItem {
-	var s win.SIZE
-	ll.SendMessage(win.LM_GETIDEALSIZE, uintptr(ll.IntFrom96DPI(ll.maxSize96dpi.Width)), uintptr(unsafe.Pointer(&s)))
+	var s gdi32.SIZE
+	ll.SendMessage(commctrl.LM_GETIDEALSIZE, uintptr(ll.IntFrom96DPI(ll.maxSize96dpi.Width)), uintptr(unsafe.Pointer(&s)))
 
 	return &linkLabelLayoutItem{
 		idealSize: sizeFromSIZE(s),
