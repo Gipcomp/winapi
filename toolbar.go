@@ -17,6 +17,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type ToolBarButtonStyle int
@@ -160,7 +161,7 @@ func (tb *ToolBar) applyDefaultButtonWidth() error {
 
 	lParam := uintptr(win.MAKELONG(uint16(width), uint16(width)))
 	if tb.SendMessage(commctrl.TB_SETBUTTONWIDTH, 0, lParam) == 0 {
-		return newError("SendMessage(TB_SETBUTTONWIDTH)")
+		return errs.NewError("SendMessage(TB_SETBUTTONWIDTH)")
 	}
 
 	size := uint32(tb.SendMessage(commctrl.TB_GETBUTTONSIZE, 0, 0))
@@ -168,7 +169,7 @@ func (tb *ToolBar) applyDefaultButtonWidth() error {
 
 	lParam = uintptr(win.MAKELONG(uint16(width), height))
 	if win.FALSE == tb.SendMessage(commctrl.TB_SETBUTTONSIZE, 0, lParam) {
-		return newError("SendMessage(TB_SETBUTTONSIZE)")
+		return errs.NewError("SendMessage(TB_SETBUTTONSIZE)")
 	}
 
 	return nil
@@ -193,7 +194,7 @@ func (tb *ToolBar) SetDefaultButtonWidth(width int) error {
 	}
 
 	if width < 0 {
-		return newError("width must be >= 0")
+		return errs.NewError("width must be >= 0")
 	}
 
 	old := tb.defaultButtonWidth
@@ -217,7 +218,7 @@ func (tb *ToolBar) MaxTextRows() int {
 
 func (tb *ToolBar) SetMaxTextRows(maxTextRows int) error {
 	if tb.SendMessage(commctrl.TB_SETMAXTEXTROWS, uintptr(maxTextRows), 0) == 0 {
-		return newError("SendMessage(TB_SETMAXTEXTROWS)")
+		return errs.NewError("SendMessage(TB_SETMAXTEXTROWS)")
 	}
 
 	tb.maxTextRows = maxTextRows
@@ -419,7 +420,7 @@ func (tb *ToolBar) onActionChanged(action *Action) error {
 		uintptr(action.id),
 		uintptr(unsafe.Pointer(&tbbi))) == 0 {
 
-		return newError("SendMessage(TB_SETBUTTONINFO) failed")
+		return errs.NewError("SendMessage(TB_SETBUTTONINFO) failed")
 	}
 
 	tb.RequestLayout()
@@ -474,7 +475,7 @@ func (tb *ToolBar) insertAction(action *Action, visibleChanged bool) (err error)
 	tb.SendMessage(commctrl.TB_BUTTONSTRUCTSIZE, uintptr(unsafe.Sizeof(tbb)), 0)
 
 	if win.FALSE == tb.SendMessage(commctrl.TB_INSERTBUTTON, uintptr(index), uintptr(unsafe.Pointer(&tbb))) {
-		return newError("SendMessage(TB_ADDBUTTONS)")
+		return errs.NewError("SendMessage(TB_ADDBUTTONS)")
 	}
 
 	if err = tb.applyDefaultButtonWidth(); err != nil {
@@ -496,7 +497,7 @@ func (tb *ToolBar) removeAction(action *Action, visibleChanged bool) error {
 	}
 
 	if tb.SendMessage(commctrl.TB_DELETEBUTTON, uintptr(index), 0) == 0 {
-		return newError("SendMessage(TB_DELETEBUTTON) failed")
+		return errs.NewError("SendMessage(TB_DELETEBUTTON) failed")
 	}
 
 	tb.RequestLayout()

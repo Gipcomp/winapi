@@ -12,6 +12,7 @@ import (
 	"github.com/Gipcomp/win32/oleaut32"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 // AccState enum defines the state of the window/control
@@ -189,13 +190,13 @@ func (a *Accessibility) SetValueMap(valueMap string) error {
 func (a *Accessibility) accSetPropertyInt(hwnd handle.HWND, idProp *oleacc.MSAAPROPID, event uint32, value int32) error {
 	accPropServices := a.wb.group.accessibilityServices()
 	if accPropServices == nil {
-		return newError("Dynamic Annotation not available")
+		return errs.NewError("Dynamic Annotation not available")
 	}
 	var v oleaut32.VARIANT
 	v.SetLong(value)
 	hr := accPropServices.SetHwndProp(hwnd, user32.OBJID_CLIENT, user32.CHILDID_SELF, idProp, &v)
 	if win.FAILED(hr) {
-		return errorFromHRESULT("IAccPropServices.SetHwndProp", hr)
+		return errs.ErrorFromHRESULT("IAccPropServices.SetHwndProp", hr)
 	}
 	if user32.EVENT_OBJECT_CREATE <= event && event <= user32.EVENT_OBJECT_END {
 		user32.NotifyWinEvent(event, hwnd, user32.OBJID_CLIENT, user32.CHILDID_SELF)
@@ -207,11 +208,11 @@ func (a *Accessibility) accSetPropertyInt(hwnd handle.HWND, idProp *oleacc.MSAAP
 func (a *Accessibility) accSetPropertyStr(hwnd handle.HWND, idProp *oleacc.MSAAPROPID, event uint32, value string) error {
 	accPropServices := a.wb.group.accessibilityServices()
 	if accPropServices == nil {
-		return newError("Dynamic Annotation not available")
+		return errs.NewError("Dynamic Annotation not available")
 	}
 	hr := accPropServices.SetHwndPropStr(hwnd, user32.OBJID_CLIENT, user32.CHILDID_SELF, idProp, value)
 	if win.FAILED(hr) {
-		return errorFromHRESULT("IAccPropServices.SetHwndPropStr", hr)
+		return errs.ErrorFromHRESULT("IAccPropServices.SetHwndPropStr", hr)
 	}
 	if user32.EVENT_OBJECT_CREATE <= event && event <= user32.EVENT_OBJECT_END {
 		user32.NotifyWinEvent(event, hwnd, user32.OBJID_CLIENT, user32.CHILDID_SELF)

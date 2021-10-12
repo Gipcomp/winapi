@@ -6,7 +6,10 @@
 
 package winapi
 
-import "github.com/Gipcomp/win32/handle"
+import (
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/winapi/errs"
+)
 
 type FlowLayout struct {
 	LayoutBase
@@ -37,16 +40,16 @@ func (l *FlowLayout) StretchFactor(widget Widget) int {
 func (l *FlowLayout) SetStretchFactor(widget Widget, factor int) error {
 	if factor != l.StretchFactor(widget) {
 		if l.container == nil {
-			return newError("container required")
+			return errs.NewError("container required")
 		}
 
 		handle := widget.Handle()
 
 		if !l.container.Children().containsHandle(handle) {
-			return newError("unknown widget")
+			return errs.NewError("unknown widget")
 		}
 		if factor < 1 {
-			return newError("factor must be >= 1")
+			return errs.NewError("factor must be >= 1")
 		}
 
 		l.hwnd2StretchFactor[handle] = factor

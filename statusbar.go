@@ -15,6 +15,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 // StatusBar is a widget that displays status messages.
@@ -100,7 +101,7 @@ func (sb *StatusBar) updateParts() error {
 		uintptr(len(items)),
 		uintptr(unsafe.Pointer(rep))) {
 
-		return newError("SB_SETPARTS")
+		return errs.NewError("SB_SETPARTS")
 	}
 
 	return nil
@@ -290,7 +291,7 @@ func (sbi *StatusBarItem) updateIcon(index int) error {
 		uintptr(index),
 		uintptr(hIcon)) {
 
-		return newError("SB_SETICON")
+		return errs.NewError("SB_SETICON")
 	}
 
 	return nil
@@ -307,7 +308,7 @@ func (sbi *StatusBarItem) updateText(index int) error {
 		uintptr(win.MAKEWORD(byte(index), 0)),
 		uintptr(unsafe.Pointer(utf16))) {
 
-		return newError("SB_SETTEXT")
+		return errs.NewError("SB_SETTEXT")
 	}
 
 	return nil
@@ -382,7 +383,7 @@ func (l *StatusBarItemList) Contains(item *StatusBarItem) bool {
 
 func (l *StatusBarItemList) Insert(index int, item *StatusBarItem) error {
 	if item.sb != nil {
-		return newError("item already contained in a StatusBar")
+		return errs.NewError("item already contained in a StatusBar")
 	}
 
 	l.items = append(l.items, nil)

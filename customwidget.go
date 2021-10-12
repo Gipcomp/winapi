@@ -12,6 +12,7 @@ import (
 	"github.com/Gipcomp/win32/gdi32"
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const customWidgetWindowClass = `\o/ Walk_CustomWidget_Class \o/`
@@ -116,7 +117,7 @@ func (cw *CustomWidget) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uin
 	switch msg {
 	case user32.WM_PAINT:
 		if cw.paint == nil && cw.paintPixels == nil {
-			newError("paint(Pixels) func is nil")
+			errs.NewError("paint(Pixels) func is nil")
 			break
 		}
 
@@ -129,7 +130,7 @@ func (cw *CustomWidget) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uin
 			hdc = gdi32.HDC(wParam)
 		}
 		if hdc == 0 {
-			newError("BeginPaint failed")
+			errs.NewError("BeginPaint failed")
 			break
 		}
 		defer func() {
@@ -140,7 +141,7 @@ func (cw *CustomWidget) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uin
 
 		canvas, err := newCanvasFromHDC(hdc)
 		if err != nil {
-			newError("newCanvasFromHDC failed")
+			errs.NewError("newCanvasFromHDC failed")
 			break
 		}
 		defer canvas.Dispose()
@@ -155,7 +156,7 @@ func (cw *CustomWidget) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uin
 		}
 
 		if err != nil {
-			newError("paint failed")
+			errs.NewError("paint failed")
 			break
 		}
 
@@ -188,7 +189,7 @@ func (cw *CustomWidget) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uin
 func (cw *CustomWidget) bufferedPaint(canvas *Canvas, updateBounds Rectangle) error {
 	hdc := gdi32.CreateCompatibleDC(canvas.hdc)
 	if hdc == 0 {
-		return newError("CreateCompatibleDC failed")
+		return errs.NewError("CreateCompatibleDC failed")
 	}
 	defer gdi32.DeleteDC(hdc)
 
@@ -206,13 +207,13 @@ func (cw *CustomWidget) bufferedPaint(canvas *Canvas, updateBounds Rectangle) er
 	}
 	hbmp := gdi32.CreateCompatibleBitmap(canvas.hdc, w, h)
 	if hbmp == 0 {
-		return lastError("CreateCompatibleBitmap failed")
+		return errs.LastError("CreateCompatibleBitmap failed")
 	}
 	defer gdi32.DeleteObject(gdi32.HGDIOBJ(hbmp))
 
 	oldbmp := gdi32.SelectObject(buffered.hdc, gdi32.HGDIOBJ(hbmp))
 	if oldbmp == 0 {
-		return newError("SelectObject failed")
+		return errs.NewError("SelectObject failed")
 	}
 	defer gdi32.SelectObject(buffered.hdc, oldbmp)
 
@@ -230,7 +231,7 @@ func (cw *CustomWidget) bufferedPaint(canvas *Canvas, updateBounds Rectangle) er
 		int32(updateBounds.X), int32(updateBounds.Y), w, h,
 		buffered.hdc,
 		int32(updateBounds.X), int32(updateBounds.Y), gdi32.SRCCOPY) {
-		return lastError("buffered BitBlt failed")
+		return errs.LastError("buffered BitBlt failed")
 	}
 
 	return err

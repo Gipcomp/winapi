@@ -9,6 +9,7 @@ package winapi
 import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const splitterHandleWindowClass = `\o/ Walk_SplitterHandle_Class \o/`
@@ -25,7 +26,7 @@ type splitterHandle struct {
 
 func newSplitterHandle(splitter *Splitter) (*splitterHandle, error) {
 	if splitter == nil {
-		return nil, newError("splitter cannot be nil")
+		return nil, errs.NewError("splitter cannot be nil")
 	}
 
 	sh := new(splitterHandle)

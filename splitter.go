@@ -15,6 +15,7 @@ import (
 
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const splitterWindowClass = `\o/ Walk_Splitter_Class \o/`
@@ -88,7 +89,7 @@ func NewVSplitter(parent Container) (*Splitter, error) {
 }
 
 func (s *Splitter) SetLayout(value Layout) error {
-	return newError("not supported")
+	return errs.NewError("not supported")
 }
 
 func (s *Splitter) HandleWidth() int {
@@ -101,7 +102,7 @@ func (s *Splitter) SetHandleWidth(value int) error {
 	}
 
 	if value < 1 {
-		return newError("invalid handle width")
+		return errs.NewError("invalid handle width")
 	}
 
 	s.handleWidth = value
@@ -301,7 +302,7 @@ func (s *Splitter) Fixed(widget Widget) bool {
 func (s *Splitter) SetFixed(widget Widget, fixed bool) error {
 	item := s.layout.(*splitterLayout).hwnd2Item[widget.Handle()]
 	if item == nil {
-		return newError("unknown widget")
+		return errs.NewError("unknown widget")
 	}
 
 	item.fixed = fixed
@@ -560,7 +561,7 @@ func (s *Splitter) onRemovedWidget(index int, widget Widget) (err error) {
 
 	_, isHandle := widget.(*splitterHandle)
 	if !s.removing && isHandle && s.children.Len()%2 == 1 {
-		return newError("cannot remove splitter handle")
+		return errs.NewError("cannot remove splitter handle")
 	}
 
 	if !isHandle {

@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/Gipcomp/winapi/errs"
 )
 
 func init() {
@@ -125,5 +127,5 @@ func (rm *ResourceManager) Image(name string) (Image, error) {
 func (rm *ResourceManager) notFoundErr(typ, name string) error {
 	path := filepath.Clean(filepath.Join(rm.rootDirPath, name))
 
-	return newError(fmt.Sprintf("neither %s resource '%s' nor file '%s' could be found or the image format is not supported", typ, name, path))
+	return errs.NewError(fmt.Sprintf("neither %s resource '%s' nor file '%s' could be found or the image format is not supported", typ, name, path))
 }

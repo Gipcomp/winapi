@@ -11,13 +11,14 @@ import (
 
 	"github.com/Gipcomp/win32/kernel32"
 	"github.com/Gipcomp/win32/shell32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 func knownFolderPath(id shell32.CSIDL) (string, error) {
 	var buf [kernel32.MAX_PATH]uint16
 
 	if !shell32.SHGetSpecialFolderPath(0, &buf[0], id, false) {
-		return "", newError("SHGetSpecialFolderPath failed")
+		return "", errs.NewError("SHGetSpecialFolderPath failed")
 	}
 
 	return syscall.UTF16ToString(buf[0:]), nil
@@ -46,13 +47,13 @@ func SystemPath() (string, error) {
 func DriveNames() ([]string, error) {
 	bufLen := kernel32.GetLogicalDriveStrings(0, nil)
 	if bufLen == 0 {
-		return nil, lastError("GetLogicalDriveStrings")
+		return nil, errs.LastError("GetLogicalDriveStrings")
 	}
 	buf := make([]uint16, bufLen+1)
 
 	bufLen = kernel32.GetLogicalDriveStrings(bufLen+1, &buf[0])
 	if bufLen == 0 {
-		return nil, lastError("GetLogicalDriveStrings")
+		return nil, errs.LastError("GetLogicalDriveStrings")
 	}
 
 	var names []string

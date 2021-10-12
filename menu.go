@@ -13,6 +13,7 @@ import (
 
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/winuser"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type Menu struct {
@@ -25,7 +26,7 @@ type Menu struct {
 func newMenuBar(window Window) (*Menu, error) {
 	hMenu := user32.CreateMenu()
 	if hMenu == 0 {
-		return nil, lastError("CreateMenu")
+		return nil, errs.LastError("CreateMenu")
 	}
 
 	m := &Menu{
@@ -40,21 +41,21 @@ func newMenuBar(window Window) (*Menu, error) {
 func NewMenu() (*Menu, error) {
 	hMenu := user32.CreatePopupMenu()
 	if hMenu == 0 {
-		return nil, lastError("CreatePopupMenu")
+		return nil, errs.LastError("CreatePopupMenu")
 	}
 
 	var mi winuser.MENUINFO
 	mi.CbSize = uint32(unsafe.Sizeof(mi))
 
 	if !user32.GetMenuInfo(hMenu, &mi) {
-		return nil, lastError("GetMenuInfo")
+		return nil, errs.LastError("GetMenuInfo")
 	}
 
 	mi.FMask |= winuser.MIM_STYLE
 	mi.DwStyle = winuser.MNS_CHECKORBMP
 
 	if !user32.SetMenuInfo(hMenu, &mi) {
-		return nil, lastError("SetMenuInfo")
+		return nil, errs.LastError("SetMenuInfo")
 	}
 
 	m := &Menu{
@@ -131,7 +132,7 @@ func (m *Menu) initMenuItemInfoFromAction(mii *winuser.MENUITEMINFO, action *Act
 		var err error
 		mii.DwTypeData, err = syscall.UTF16PtrFromString(text)
 		if err != nil {
-			newError(err.Error())
+			errs.NewError(err.Error())
 		}
 		mii.Cch = uint32(len([]rune(action.text)))
 	}
@@ -184,7 +185,7 @@ func (m *Menu) onActionChanged(action *Action) error {
 	m.initMenuItemInfoFromAction(&mii, action)
 
 	if !user32.SetMenuItemInfo(m.hMenu, uint32(m.actions.indexInObserver(action)), true, &mii) {
-		return newError("SetMenuItemInfo failed")
+		return errs.NewError("SetMenuItemInfo failed")
 	}
 
 	if action.Default() {
@@ -211,7 +212,7 @@ func (m *Menu) onActionChanged(action *Action) error {
 		}
 
 		if !user32.CheckMenuRadioItem(m.hMenu, uint32(first), uint32(last), uint32(index), winuser.MF_BYPOSITION) {
-			return newError("CheckMenuRadioItem failed")
+			return errs.NewError("CheckMenuRadioItem failed")
 		}
 	}
 
@@ -253,7 +254,7 @@ func (m *Menu) insertAction(action *Action, visibleChanged bool) (err error) {
 	m.initMenuItemInfoFromAction(&mii, action)
 
 	if !user32.InsertMenuItem(m.hMenu, uint32(index), true, &mii) {
-		return newError("InsertMenuItem failed")
+		return errs.NewError("InsertMenuItem failed")
 	}
 
 	if action.Default() {
@@ -274,7 +275,7 @@ func (m *Menu) removeAction(action *Action, visibleChanged bool) error {
 	index := m.actions.indexInObserver(action)
 
 	if !user32.RemoveMenu(m.hMenu, uint32(index), winuser.MF_BYPOSITION) {
-		return lastError("RemoveMenu")
+		return errs.LastError("RemoveMenu")
 	}
 
 	if !visibleChanged {

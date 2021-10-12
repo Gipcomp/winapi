@@ -18,6 +18,7 @@ import (
 	"github.com/Gipcomp/win32/shell32"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 	"golang.org/x/sys/windows"
 )
 
@@ -107,7 +108,7 @@ func NewIconFromResource(name string) (*Icon, error) {
 func NewIconFromResourceWithSize(name string, size Size) (*Icon, error) {
 	strPtr, err := syscall.UTF16PtrFromString(name)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	return newIconFromResource(strPtr, size)
 }
@@ -261,13 +262,13 @@ func (i *Icon) handleForDPIWithError(dpi int) (user32.HICON, error) {
 		}
 		strPtr, err := syscall.UTF16PtrFromString(absFilePath)
 		if err != nil {
-			newError(err.Error())
+			errs.NewError(err.Error())
 		}
 		name = strPtr
 	} else {
 		if !i.isStock {
 			if hInst = kernel32.GetModuleHandle(nil); hInst == 0 {
-				return 0, lastError("GetModuleHandle")
+				return 0, errs.LastError("GetModuleHandle")
 			}
 		}
 
@@ -292,7 +293,7 @@ func (i *Icon) handleForDPIWithError(dpi int) (user32.HICON, error) {
 			&hIcon,
 			win.MAKELONG(0, uint16(size.Width)))
 		if hIcon == 0 {
-			return 0, newError("SHDefExtractIcon")
+			return 0, errs.NewError("SHDefExtractIcon")
 		}
 	} else {
 		hr := user32.HICON(comctl32.LoadIconWithScaleDown(
@@ -303,7 +304,7 @@ func (i *Icon) handleForDPIWithError(dpi int) (user32.HICON, error) {
 			&hIcon))
 
 		if hr < 0 || hIcon == 0 {
-			return 0, lastError("LoadIconWithScaleDown")
+			return 0, errs.LastError("LoadIconWithScaleDown")
 		}
 	}
 
@@ -349,7 +350,7 @@ func (i *Icon) drawStretched(hdc gdi32.HDC, bounds Rectangle) error {
 	}
 
 	if !user32.DrawIconEx(hdc, int32(bounds.X), int32(bounds.Y), hIcon, int32(bounds.Width), int32(bounds.Height), 0, 0, user32.DI_NORMAL) {
-		return lastError("DrawIconEx")
+		return errs.LastError("DrawIconEx")
 	}
 
 	return nil
@@ -377,7 +378,7 @@ func createAlphaCursorOrIconFromBitmap(bmp *Bitmap, hotspot Point, fIcon bool) (
 	// Create an empty mask bitmap.
 	hMonoBitmap := gdi32.CreateBitmap(int32(bmp.size.Width), int32(bmp.size.Height), 1, 1, nil)
 	if hMonoBitmap == 0 {
-		return 0, newError("CreateBitmap failed")
+		return 0, errs.NewError("CreateBitmap failed")
 	}
 	defer gdi32.DeleteObject(gdi32.HGDIOBJ(hMonoBitmap))
 
@@ -402,7 +403,7 @@ func sizeFromHICON(hIcon user32.HICON) (Size, error) {
 	var bi gdi32.BITMAPINFO
 
 	if !user32.GetIconInfo(hIcon, &ii) {
-		return Size{}, lastError("GetIconInfo")
+		return Size{}, errs.LastError("GetIconInfo")
 	}
 	defer gdi32.DeleteObject(gdi32.HGDIOBJ(ii.HbmMask))
 
@@ -416,7 +417,7 @@ func sizeFromHICON(hIcon user32.HICON) (Size, error) {
 	}
 
 	if 0 == gdi32.GetObject(gdi32.HGDIOBJ(hBmp), unsafe.Sizeof(bi), unsafe.Pointer(&bi)) {
-		return Size{}, newError("GetObject")
+		return Size{}, errs.NewError("GetObject")
 	}
 
 	return Size{int(bi.BmiHeader.BiWidth), int(bi.BmiHeader.BiHeight)}, nil

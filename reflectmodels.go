@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type reflectModel interface {
@@ -385,7 +387,7 @@ func itemsFromReflectModelDataSource(dataSource interface{}, requiredInterfaceNa
 		return items, nil
 	}
 
-	return nil, newError(fmt.Sprintf("dataSource must be a slice of struct or interface or pointer to struct or must implement %s.", requiredInterfaceName))
+	return nil, errs.NewError(fmt.Sprintf("dataSource must be a slice of struct or interface or pointer to struct or must implement %s.", requiredInterfaceName))
 }
 
 func valueFromSlice(dataSource interface{}, itemsValue reflect.Value, member string, index int) interface{} {

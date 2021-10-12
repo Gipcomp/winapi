@@ -10,6 +10,7 @@ import (
 	"github.com/Gipcomp/win32/gdi32"
 	"github.com/Gipcomp/win32/kernel32"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 // LayoutFlags specify how a Widget wants to be treated when used with a Layout.
@@ -106,7 +107,7 @@ type WidgetBase struct {
 // InitWidget initializes a Widget.
 func InitWidget(widget Widget, parent Window, className string, style, exStyle uint32) error {
 	if parent == nil {
-		return newError("parent cannot be nil")
+		return errs.NewError("parent cannot be nil")
 	}
 
 	if err := InitWindow(widget, parent, className, style|user32.WS_CHILD, exStyle); err != nil {
@@ -117,7 +118,7 @@ func InitWidget(widget Widget, parent Window, className string, style, exStyle u
 		if container.Children() == nil {
 			// Required by parents like MainWindow and GroupBox.
 			if user32.SetParent(widget.Handle(), container.Handle()) == 0 {
-				return lastError("SetParent")
+				return errs.LastError("SetParent")
 			}
 		} else {
 			if err := container.Children().Add(widget); err != nil {
@@ -194,7 +195,7 @@ func (wb *WidgetBase) BoundsPixels() Rectangle {
 	if wb.parent != nil {
 		p := b.Location().toPOINT()
 		if !user32.ScreenToClient(wb.parent.Handle(), &p) {
-			newError("ScreenToClient failed")
+			errs.NewError("ScreenToClient failed")
 			return Rectangle{}
 		}
 		b.X = int(p.X)
@@ -252,7 +253,7 @@ func (wb *WidgetBase) Alignment() Alignment2D {
 func (wb *WidgetBase) SetAlignment(alignment Alignment2D) error {
 	if alignment != wb.alignment {
 		if alignment < AlignHVDefault || alignment > AlignHFarVFar {
-			return newError("invalid Alignment value")
+			return errs.NewError("invalid Alignment value")
 		}
 
 		wb.alignment = alignment
@@ -305,7 +306,7 @@ func (wb *WidgetBase) SetParent(parent Container) (err error) {
 
 	style := uint32(user32.GetWindowLong(wb.hWnd, user32.GWL_STYLE))
 	if style == 0 {
-		return lastError("GetWindowLong")
+		return errs.LastError("GetWindowLong")
 	}
 
 	if parent == nil {
@@ -315,11 +316,11 @@ func (wb *WidgetBase) SetParent(parent Container) (err error) {
 		style |= user32.WS_POPUP
 
 		if user32.SetParent(wb.hWnd, 0) == 0 {
-			return lastError("SetParent")
+			return errs.LastError("SetParent")
 		}
 		kernel32.SetLastError(0)
 		if user32.SetWindowLong(wb.hWnd, user32.GWL_STYLE, int32(style)) == 0 {
-			return lastError("SetWindowLong")
+			return errs.LastError("SetWindowLong")
 		}
 	} else {
 		style |= user32.WS_CHILD
@@ -327,10 +328,10 @@ func (wb *WidgetBase) SetParent(parent Container) (err error) {
 
 		kernel32.SetLastError(0)
 		if user32.SetWindowLong(wb.hWnd, user32.GWL_STYLE, int32(style)) == 0 {
-			return lastError("SetWindowLong")
+			return errs.LastError("SetWindowLong")
 		}
 		if user32.SetParent(wb.hWnd, parent.Handle()) == 0 {
-			return lastError("SetParent")
+			return errs.LastError("SetParent")
 		}
 
 		if cb := parent.AsContainerBase(); cb != nil {
@@ -349,7 +350,7 @@ func (wb *WidgetBase) SetParent(parent Container) (err error) {
 		int32(b.Height),
 		user32.SWP_FRAMECHANGED) {
 
-		return lastError("SetWindowPos")
+		return errs.LastError("SetWindowPos")
 	}
 
 	oldParent := wb.parent

@@ -14,6 +14,7 @@ import (
 	"github.com/Gipcomp/win32/gdi32"
 	"github.com/Gipcomp/win32/shell32"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type ImageList struct {
@@ -49,7 +50,7 @@ func NewImageListForDPI(imageSize Size, maskColor Color, dpi int) (*ImageList, e
 		8,
 		8)
 	if hIml == 0 {
-		return nil, newError("ImageList_Create failed")
+		return nil, errs.NewError("ImageList_Create failed")
 	}
 
 	return &ImageList{
@@ -69,7 +70,7 @@ func (il *ImageList) Handle() comctl32.HIMAGELIST {
 
 func (il *ImageList) Add(bitmap, maskBitmap *Bitmap) (int, error) {
 	if bitmap == nil {
-		return 0, newError("bitmap cannot be nil")
+		return 0, errs.NewError("bitmap cannot be nil")
 	}
 
 	key := bitmapMaskedBitmap{bitmap: bitmap, mask: maskBitmap}
@@ -85,7 +86,7 @@ func (il *ImageList) Add(bitmap, maskBitmap *Bitmap) (int, error) {
 
 	index := int(comctl32.ImageList_Add(il.hIml, bitmap.handle(), maskHandle))
 	if index == -1 {
-		return 0, newError("ImageList_Add failed")
+		return 0, errs.NewError("ImageList_Add failed")
 	}
 
 	il.bitmapMaskedBitmap2Index[key] = index
@@ -95,7 +96,7 @@ func (il *ImageList) Add(bitmap, maskBitmap *Bitmap) (int, error) {
 
 func (il *ImageList) AddMasked(bitmap *Bitmap) (int32, error) {
 	if bitmap == nil {
-		return 0, newError("bitmap cannot be nil")
+		return 0, errs.NewError("bitmap cannot be nil")
 	}
 
 	if index, ok := il.colorMaskedBitmap2Index[bitmap]; ok {
@@ -107,7 +108,7 @@ func (il *ImageList) AddMasked(bitmap *Bitmap) (int32, error) {
 		bitmap.handle(),
 		gdi32.COLORREF(il.maskColor))
 	if index == -1 {
-		return 0, newError("ImageList_AddMasked failed")
+		return 0, errs.NewError("ImageList_AddMasked failed")
 	}
 
 	il.colorMaskedBitmap2Index[bitmap] = int(index)
@@ -117,7 +118,7 @@ func (il *ImageList) AddMasked(bitmap *Bitmap) (int32, error) {
 
 func (il *ImageList) AddIcon(icon *Icon) (int32, error) {
 	if icon == nil {
-		return 0, newError("icon cannot be nil")
+		return 0, errs.NewError("icon cannot be nil")
 	}
 
 	if index, ok := il.icon2Index[icon]; ok {
@@ -126,7 +127,7 @@ func (il *ImageList) AddIcon(icon *Icon) (int32, error) {
 
 	index := comctl32.ImageList_ReplaceIcon(il.hIml, -1, icon.handleForDPI(il.dpi))
 	if index == -1 {
-		return 0, newError("ImageList_ReplaceIcon failed")
+		return 0, errs.NewError("ImageList_ReplaceIcon failed")
 	}
 
 	il.icon2Index[icon] = index
@@ -156,7 +157,7 @@ func (il *ImageList) AddImage(image interface{}) (int32, error) {
 
 func (il *ImageList) DrawPixels(canvas *Canvas, index int, bounds Rectangle) error {
 	if !comctl32.ImageList_DrawEx(il.hIml, int32(index), canvas.hdc, int32(bounds.X), int32(bounds.Y), int32(bounds.Width), int32(bounds.Height), gdi32.CLR_DEFAULT, gdi32.CLR_DEFAULT, comctl32.ILD_NORMAL) {
-		return newError("ImageList_DrawEx")
+		return errs.NewError("ImageList_DrawEx")
 	}
 
 	return nil
@@ -189,7 +190,7 @@ func imageListForImage(image interface{}, dpi int) (hIml comctl32.HIMAGELIST, is
 
 		hIml = comctl32.ImageList_Create(w, h, comctl32.ILC_MASK|comctl32.ILC_COLOR32, 8, 8)
 		if hIml == 0 {
-			return 0, false, newError("ImageList_Create failed")
+			return 0, false, errs.NewError("ImageList_Create failed")
 		}
 	}
 
@@ -200,7 +201,7 @@ func iconIndexAndHImlForFilePath(filePath string) (int32, comctl32.HIMAGELIST) {
 	var shfi shell32.SHFILEINFO
 	strPtr, err := syscall.UTF16PtrFromString(filePath)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	if hIml := comctl32.HIMAGELIST(shell32.SHGetFileInfo(
 		strPtr,

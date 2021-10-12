@@ -13,6 +13,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const groupBoxWindowClass = `\o/ Walk_GroupBox_Class \o/`
@@ -52,14 +53,14 @@ func NewGroupBox(parent Container) (*GroupBox, error) {
 	}()
 	strPtr, err2 := syscall.UTF16PtrFromString("BUTTON")
 	if err2 != nil {
-		newError(err2.Error())
+		errs.NewError(err2.Error())
 	}
 	gb.hWndGroupBox = user32.CreateWindowEx(
 		0, strPtr, nil,
 		user32.WS_CHILD|user32.WS_VISIBLE|user32.BS_GROUPBOX,
 		0, 0, 80, 24, gb.hWnd, 0, 0, nil)
 	if gb.hWndGroupBox == 0 {
-		return nil, lastError("CreateWindowEx(BUTTON)")
+		return nil, errs.LastError("CreateWindowEx(BUTTON)")
 	}
 	user32.SetWindowLong(gb.hWndGroupBox, user32.GWL_ID, 1)
 
@@ -353,7 +354,7 @@ func (gb *GroupBox) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr
 				int32(wbcb.Height),
 				true) {
 
-				lastError("MoveWindow")
+				errs.LastError("MoveWindow")
 				break
 			}
 

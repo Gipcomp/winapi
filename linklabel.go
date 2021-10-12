@@ -16,6 +16,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type LinkLabel struct {
@@ -197,7 +198,7 @@ func (lll *LinkLabelLink) hasState(state uint32) (bool, error) {
 	}
 
 	if win.TRUE != lll.ll.SendMessage(commctrl.LM_GETITEM, 0, uintptr(unsafe.Pointer(&li))) {
-		return false, newError("LM_GETITEM")
+		return false, errs.NewError("LM_GETITEM")
 	}
 
 	return li.State&state == state, nil
@@ -217,7 +218,7 @@ func (lll *LinkLabelLink) setState(state uint32, set bool) error {
 	li.ILink = int32(lll.index)
 
 	if win.TRUE != lll.ll.SendMessage(commctrl.LM_SETITEM, 0, uintptr(unsafe.Pointer(&li))) {
-		return newError("LM_SETITEM")
+		return errs.NewError("LM_SETITEM")
 	}
 
 	return nil

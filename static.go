@@ -14,6 +14,7 @@ import (
 	"github.com/Gipcomp/win32/gdi32"
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const staticWindowClass = `\o/ Walk_Static_Class \o/`
@@ -62,7 +63,7 @@ func (s *static) init(widget Widget, parent Container, style uint32) error {
 		0,
 		nil,
 	); s.hwndStatic == 0 {
-		return newError("creating static failed")
+		return errs.NewError("creating static failed")
 	}
 
 	if err := s.group.toolTip.AddTool(s); err != nil {
@@ -71,7 +72,7 @@ func (s *static) init(widget Widget, parent Container, style uint32) error {
 
 	s.origStaticWndProcPtr = user32.SetWindowLongPtr(s.hwndStatic, user32.GWLP_WNDPROC, staticWndProcPtr)
 	if s.origStaticWndProcPtr == 0 {
-		return lastError("SetWindowLongPtr")
+		return errs.LastError("SetWindowLongPtr")
 	}
 
 	s.applyFont(s.Font())

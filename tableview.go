@@ -22,6 +22,7 @@ import (
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/uxtheme"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const tableViewWindowClass = `\o/ Walk_TableView_Class \o/`
@@ -184,7 +185,7 @@ func NewTableViewWithCfg(parent Container, cfg *TableViewCfg) (*TableView, error
 	}
 	strPtr, err := syscall.UTF16PtrFromString("SysListView32")
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	if tv.hwndFrozenLV = user32.CreateWindowEx(
 		0,
@@ -200,18 +201,18 @@ func NewTableViewWithCfg(parent Container, cfg *TableViewCfg) (*TableView, error
 		0,
 		nil,
 	); tv.hwndFrozenLV == 0 {
-		return nil, newError("creating frozen lv failed")
+		return nil, errs.NewError("creating frozen lv failed")
 	}
 
 	tv.frozenLVOrigWndProcPtr = user32.SetWindowLongPtr(tv.hwndFrozenLV, user32.GWLP_WNDPROC, tableViewFrozenLVWndProcPtr)
 	if tv.frozenLVOrigWndProcPtr == 0 {
-		return nil, lastError("SetWindowLongPtr")
+		return nil, errs.LastError("SetWindowLongPtr")
 	}
 
 	tv.hwndFrozenHdr = handle.HWND(user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_GETHEADER, 0, 0))
 	tv.frozenHdrOrigWndProcPtr = user32.SetWindowLongPtr(tv.hwndFrozenHdr, user32.GWLP_WNDPROC, tableViewHdrWndProcPtr)
 	if tv.frozenHdrOrigWndProcPtr == 0 {
-		return nil, lastError("SetWindowLongPtr")
+		return nil, errs.LastError("SetWindowLongPtr")
 	}
 
 	if tv.hwndNormalLV = user32.CreateWindowEx(
@@ -228,18 +229,18 @@ func NewTableViewWithCfg(parent Container, cfg *TableViewCfg) (*TableView, error
 		0,
 		nil,
 	); tv.hwndNormalLV == 0 {
-		return nil, newError("creating normal lv failed")
+		return nil, errs.NewError("creating normal lv failed")
 	}
 
 	tv.normalLVOrigWndProcPtr = user32.SetWindowLongPtr(tv.hwndNormalLV, user32.GWLP_WNDPROC, tableViewNormalLVWndProcPtr)
 	if tv.normalLVOrigWndProcPtr == 0 {
-		return nil, lastError("SetWindowLongPtr")
+		return nil, errs.LastError("SetWindowLongPtr")
 	}
 
 	tv.hwndNormalHdr = handle.HWND(user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_GETHEADER, 0, 0))
 	tv.normalHdrOrigWndProcPtr = user32.SetWindowLongPtr(tv.hwndNormalHdr, user32.GWLP_WNDPROC, tableViewHdrWndProcPtr)
 	if tv.normalHdrOrigWndProcPtr == 0 {
-		return nil, lastError("SetWindowLongPtr")
+		return nil, errs.LastError("SetWindowLongPtr")
 	}
 
 	tv.SetPersistent(true)
@@ -250,13 +251,13 @@ func NewTableViewWithCfg(parent Container, cfg *TableViewCfg) (*TableView, error
 	user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_SETEXTENDEDLISTVIEWSTYLE, 0, exStyle)
 	explorer, err := syscall.UTF16PtrFromString("Explorer")
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	if hr := uxtheme.SetWindowTheme(tv.hwndFrozenLV, explorer, nil); win.FAILED(hr) {
-		return nil, errorFromHRESULT("SetWindowTheme", hr)
+		return nil, errs.ErrorFromHRESULT("SetWindowTheme", hr)
 	}
 	if hr := uxtheme.SetWindowTheme(tv.hwndNormalLV, explorer, nil); win.FAILED(hr) {
-		return nil, errorFromHRESULT("SetWindowTheme", hr)
+		return nil, errs.ErrorFromHRESULT("SetWindowTheme", hr)
 	}
 
 	user32.SendMessage(tv.hwndFrozenLV, user32.WM_CHANGEUISTATE, uintptr(win.MAKELONG(user32.UIS_SET, user32.UISF_HIDEFOCUS)), 0)
@@ -354,10 +355,10 @@ func (tv *TableView) Dispose() {
 
 	if tv.hWnd != 0 {
 		if !user32.KillTimer(tv.hWnd, tableViewCurrentIndexChangedTimerId) {
-			lastError("KillTimer")
+			errs.LastError("KillTimer")
 		}
 		if !user32.KillTimer(tv.hWnd, tableViewSelectedIndexesChangedTimerId) {
-			lastError("KillTimer")
+			errs.LastError("KillTimer")
 		}
 	}
 
@@ -454,7 +455,7 @@ func (tv *TableView) ApplySysColors() {
 	}
 	listView, err := syscall.UTF16PtrFromString("Listview")
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	if hThemeListView := uxtheme.OpenThemeData(tv.hwndNormalLV, listView); hThemeListView != 0 {
 		defer uxtheme.CloseThemeData(hThemeListView)
@@ -474,7 +475,7 @@ func (tv *TableView) ApplySysColors() {
 	}
 	button, err := syscall.UTF16PtrFromString("BUTTON")
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	if hThemeButton := uxtheme.OpenThemeData(tv.hwndNormalLV, button); hThemeButton != 0 {
 		defer uxtheme.CloseThemeData(hThemeButton)
@@ -539,7 +540,7 @@ func (tv *TableView) SetColumnsSizable(b bool) error {
 		}
 
 		if user32.SetWindowLong(headerHWnd, user32.GWL_STYLE, style) == 0 {
-			return lastError("SetWindowLong(GWL_STYLE)")
+			return errs.LastError("SetWindowLong(GWL_STYLE)")
 		}
 
 		return nil
@@ -651,13 +652,13 @@ func (tv *TableView) VisibleColumnsInDisplayOrder() []*TableViewColumn {
 
 	if frozenCount > 0 {
 		if win.FALSE == user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_GETCOLUMNORDERARRAY, uintptr(frozenCount), uintptr(unsafe.Pointer(&indices[0]))) {
-			newError("LVM_GETCOLUMNORDERARRAY")
+			errs.NewError("LVM_GETCOLUMNORDERARRAY")
 			return nil
 		}
 	}
 	if normalCount > 0 {
 		if win.FALSE == user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_GETCOLUMNORDERARRAY, uintptr(normalCount), uintptr(unsafe.Pointer(&indices[frozenCount]))) {
-			newError("LVM_GETCOLUMNORDERARRAY")
+			errs.NewError("LVM_GETCOLUMNORDERARRAY")
 			return nil
 		}
 	}
@@ -703,10 +704,10 @@ func (tv *TableView) UpdateItem(index int) error {
 		}
 	} else {
 		if win.FALSE == user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_UPDATE, uintptr(index), 0) {
-			return newError("LVM_UPDATE")
+			return errs.NewError("LVM_UPDATE")
 		}
 		if win.FALSE == user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_UPDATE, uintptr(index), 0) {
-			return newError("LVM_UPDATE")
+			return errs.NewError("LVM_UPDATE")
 		}
 	}
 
@@ -724,7 +725,7 @@ func (tv *TableView) attachModel() {
 				uint32(tv.itemStateChangedEventDelay),
 				0,
 			) == 0 {
-				lastError("SetTimer")
+				errs.LastError("SetTimer")
 			}
 		}
 
@@ -952,10 +953,10 @@ func (tv *TableView) setItemCount() error {
 	}
 
 	if user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_SETITEMCOUNT, uintptr(count), commctrl.LVSICF_NOINVALIDATEALL|commctrl.LVSICF_NOSCROLL) == 0 {
-		return newError("SendMessage(LVM_SETITEMCOUNT)")
+		return errs.NewError("SendMessage(LVM_SETITEMCOUNT)")
 	}
 	if user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_SETITEMCOUNT, uintptr(count), commctrl.LVSICF_NOINVALIDATEALL|commctrl.LVSICF_NOSCROLL) == 0 {
-		return newError("SendMessage(LVM_SETITEMCOUNT)")
+		return errs.NewError("SendMessage(LVM_SETITEMCOUNT)")
 	}
 
 	return nil
@@ -1004,7 +1005,7 @@ func (tv *TableView) SetCheckBoxes(checkBoxes bool) {
 	}
 
 	if win.FALSE == user32.SendMessage(hwnd, commctrl.LVM_SETCALLBACKMASK, mask, 0) {
-		newError("SendMessage(LVM_SETCALLBACKMASK)")
+		errs.NewError("SendMessage(LVM_SETCALLBACKMASK)")
 	}
 }
 
@@ -1107,7 +1108,7 @@ func (tv *TableView) setSortIcon(index int, order SortOrder) error {
 		itemPtr := uintptr(unsafe.Pointer(&item))
 
 		if user32.SendMessage(headerHwnd, commctrl.HDM_GETITEM, iPtr, itemPtr) == 0 {
-			return newError("SendMessage(HDM_GETITEM)")
+			return errs.NewError("SendMessage(HDM_GETITEM)")
 		}
 
 		if i == idx {
@@ -1125,7 +1126,7 @@ func (tv *TableView) setSortIcon(index int, order SortOrder) error {
 		}
 
 		if user32.SendMessage(headerHwnd, commctrl.HDM_SETITEM, iPtr, itemPtr) == 0 {
-			return newError("SendMessage(HDM_SETITEM)")
+			return errs.NewError("SendMessage(HDM_SETITEM)")
 		}
 	}
 
@@ -1197,10 +1198,10 @@ func (tv *TableView) SetCurrentIndex(index int) error {
 
 	if tv.MultiSelection() {
 		if win.FALSE == user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_SETITEMSTATE, ^uintptr(0), uintptr(unsafe.Pointer(&lvi))) {
-			return newError("SendMessage(LVM_SETITEMSTATE)")
+			return errs.NewError("SendMessage(LVM_SETITEMSTATE)")
 		}
 		if win.FALSE == user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_SETITEMSTATE, ^uintptr(0), uintptr(unsafe.Pointer(&lvi))) {
-			return newError("SendMessage(LVM_SETITEMSTATE)")
+			return errs.NewError("SendMessage(LVM_SETITEMSTATE)")
 		}
 	}
 
@@ -1209,26 +1210,26 @@ func (tv *TableView) SetCurrentIndex(index int) error {
 	}
 
 	if win.FALSE == user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_SETITEMSTATE, uintptr(index), uintptr(unsafe.Pointer(&lvi))) {
-		return newError("SendMessage(LVM_SETITEMSTATE)")
+		return errs.NewError("SendMessage(LVM_SETITEMSTATE)")
 	}
 	if win.FALSE == user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_SETITEMSTATE, uintptr(index), uintptr(unsafe.Pointer(&lvi))) {
-		return newError("SendMessage(LVM_SETITEMSTATE)")
+		return errs.NewError("SendMessage(LVM_SETITEMSTATE)")
 	}
 
 	if index > -1 {
 		if win.FALSE == user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_ENSUREVISIBLE, uintptr(index), uintptr(0)) {
-			return newError("SendMessage(LVM_ENSUREVISIBLE)")
+			return errs.NewError("SendMessage(LVM_ENSUREVISIBLE)")
 		}
 		// Windows bug? Sometimes a second LVM_ENSUREVISIBLE is required.
 		if win.FALSE == user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_ENSUREVISIBLE, uintptr(index), uintptr(0)) {
-			return newError("SendMessage(LVM_ENSUREVISIBLE)")
+			return errs.NewError("SendMessage(LVM_ENSUREVISIBLE)")
 		}
 		if win.FALSE == user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_ENSUREVISIBLE, uintptr(index), uintptr(0)) {
-			return newError("SendMessage(LVM_ENSUREVISIBLE)")
+			return errs.NewError("SendMessage(LVM_ENSUREVISIBLE)")
 		}
 		// Windows bug? Sometimes a second LVM_ENSUREVISIBLE is required.
 		if win.FALSE == user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_ENSUREVISIBLE, uintptr(index), uintptr(0)) {
-			return newError("SendMessage(LVM_ENSUREVISIBLE)")
+			return errs.NewError("SendMessage(LVM_ENSUREVISIBLE)")
 		}
 
 		if ip, ok := tv.providedModel.(IDProvider); ok && tv.restoringCurrentItemOnReset {
@@ -1305,7 +1306,7 @@ func (tv *TableView) EnsureItemVisible(index int) {
 func (tv *TableView) SelectionHiddenWithoutFocus() bool {
 	style := uint(user32.GetWindowLong(tv.hwndNormalLV, user32.GWL_STYLE))
 	if style == 0 {
-		lastError("GetWindowLong")
+		errs.LastError("GetWindowLong")
 		return false
 	}
 
@@ -1327,7 +1328,7 @@ func (tv *TableView) SetSelectionHiddenWithoutFocus(hidden bool) error {
 func (tv *TableView) MultiSelection() bool {
 	style := uint(user32.GetWindowLong(tv.hwndNormalLV, user32.GWL_STYLE))
 	if style == 0 {
-		lastError("GetWindowLong")
+		errs.LastError("GetWindowLong")
 		return false
 	}
 
@@ -1366,10 +1367,10 @@ func (tv *TableView) SetSelectedIndexes(indexes []int) error {
 	lp := uintptr(unsafe.Pointer(lvi))
 
 	if win.FALSE == user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_SETITEMSTATE, ^uintptr(0), lp) {
-		return newError("SendMessage(LVM_SETITEMSTATE)")
+		return errs.NewError("SendMessage(LVM_SETITEMSTATE)")
 	}
 	if win.FALSE == user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_SETITEMSTATE, ^uintptr(0), lp) {
-		return newError("SendMessage(LVM_SETITEMSTATE)")
+		return errs.NewError("SendMessage(LVM_SETITEMSTATE)")
 	}
 
 	selectAll := false
@@ -1381,10 +1382,10 @@ func (tv *TableView) SetSelectedIndexes(indexes []int) error {
 			val = ^uintptr(0)
 		}
 		if win.FALSE == user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_SETITEMSTATE, val, lp) && i != -1 {
-			return newError("SendMessage(LVM_SETITEMSTATE)")
+			return errs.NewError("SendMessage(LVM_SETITEMSTATE)")
 		}
 		if win.FALSE == user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_SETITEMSTATE, val, lp) && i != -1 {
-			return newError("SendMessage(LVM_SETITEMSTATE)")
+			return errs.NewError("SendMessage(LVM_SETITEMSTATE)")
 		}
 	}
 
@@ -1442,7 +1443,7 @@ func (tv *TableView) copySelectedIndexes(hwndTo, hwndFrom handle.HWND) error {
 	lp := uintptr(unsafe.Pointer(lvi))
 
 	if win.FALSE == user32.SendMessage(hwndTo, commctrl.LVM_SETITEMSTATE, ^uintptr(0), lp) {
-		return newError("SendMessage(LVM_SETITEMSTATE)")
+		return errs.NewError("SendMessage(LVM_SETITEMSTATE)")
 	}
 
 	lvi.StateMask = commctrl.LVIS_SELECTED
@@ -1453,7 +1454,7 @@ func (tv *TableView) copySelectedIndexes(hwndTo, hwndFrom handle.HWND) error {
 		j = int(user32.SendMessage(hwndFrom, commctrl.LVM_GETNEXTITEM, uintptr(j), commctrl.LVNI_SELECTED))
 
 		if win.FALSE == user32.SendMessage(hwndTo, commctrl.LVM_SETITEMSTATE, uintptr(j), lp) {
-			return newError("SendMessage(LVM_SETITEMSTATE)")
+			return errs.NewError("SendMessage(LVM_SETITEMSTATE)")
 		}
 	}
 
@@ -1494,7 +1495,7 @@ func (tv *TableView) publishSelectedIndexesChanged() {
 			tableViewSelectedIndexesChangedTimerId,
 			uint32(tv.itemStateChangedEventDelay),
 			0) == 0 {
-			lastError("SetTimer")
+			errs.LastError("SetTimer")
 		}
 	} else {
 		tv.selectedIndexesChangedPublisher.Publish()
@@ -1578,7 +1579,7 @@ func (tv *TableView) StretchLastColumn() error {
 
 	if lp > 0 {
 		if user32.SendMessage(hwnd, commctrl.LVM_SETCOLUMNWIDTH, uintptr(colCount-1), lp) == 0 {
-			return newError("LVM_SETCOLUMNWIDTH failed")
+			return errs.NewError("LVM_SETCOLUMNWIDTH failed")
 		}
 
 		if dpi := tv.DPI(); dpi != tv.dpiOfPrevStretchLastColumn {
@@ -1683,14 +1684,14 @@ func (tv *TableView) SaveState() error {
 		lp = uintptr(unsafe.Pointer(&indices[0]))
 
 		if user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_GETCOLUMNORDERARRAY, uintptr(frozenCount), lp) == 0 {
-			return newError("LVM_GETCOLUMNORDERARRAY")
+			return errs.NewError("LVM_GETCOLUMNORDERARRAY")
 		}
 	}
 	if normalCount > 0 {
 		lp = uintptr(unsafe.Pointer(&indices[frozenCount]))
 
 		if user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_GETCOLUMNORDERARRAY, uintptr(normalCount), lp) == 0 {
-			return newError("LVM_GETCOLUMNORDERARRAY")
+			return errs.NewError("LVM_GETCOLUMNORDERARRAY")
 		}
 	}
 
@@ -1817,14 +1818,14 @@ func (tv *TableView) RestoreState() error {
 		lp = uintptr(unsafe.Pointer(&indices[0]))
 
 		if user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_SETCOLUMNORDERARRAY, uintptr(frozenCount), lp) == 0 {
-			return newError("LVM_SETCOLUMNORDERARRAY")
+			return errs.NewError("LVM_SETCOLUMNORDERARRAY")
 		}
 	}
 	if normalCount > 0 {
 		lp = uintptr(unsafe.Pointer(&indices[frozenCount]))
 
 		if user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_SETCOLUMNORDERARRAY, uintptr(normalCount), lp) == 0 {
-			return newError("LVM_SETCOLUMNORDERARRAY")
+			return errs.NewError("LVM_SETCOLUMNORDERARRAY")
 		}
 	}
 
@@ -1856,14 +1857,14 @@ func (tv *TableView) toggleItemChecked(index int) error {
 	checked := tv.itemChecker.Checked(index)
 
 	if err := tv.itemChecker.SetChecked(index, !checked); err != nil {
-		return wrapError(err)
+		return errs.WrapError(err)
 	}
 
 	if win.FALSE == user32.SendMessage(tv.hwndFrozenLV, commctrl.LVM_UPDATE, uintptr(index), 0) {
-		return newError("SendMessage(LVM_UPDATE)")
+		return errs.NewError("SendMessage(LVM_UPDATE)")
 	}
 	if win.FALSE == user32.SendMessage(tv.hwndNormalLV, commctrl.LVM_UPDATE, uintptr(index), 0) {
-		return newError("SendMessage(LVM_UPDATE)")
+		return errs.NewError("SendMessage(LVM_UPDATE)")
 	}
 
 	return nil
@@ -2136,7 +2137,7 @@ func (tv *TableView) lvWndProc(origWndProcPtr uintptr, hwnd handle.HWND, msg uin
 				}
 				utf16, err := syscall.UTF16FromString(text)
 				if err != nil {
-					newError(err.Error())
+					errs.NewError(err.Error())
 				}
 				buf := (*[264]uint16)(unsafe.Pointer(di.Item.PszText))
 				max := mini(len(utf16), int(di.Item.CchTextMax))
@@ -2398,7 +2399,7 @@ func (tv *TableView) lvWndProc(origWndProcPtr uintptr, hwnd handle.HWND, msg uin
 						uint32(tv.itemStateChangedEventDelay),
 						0) == 0 {
 
-						lastError("SetTimer")
+						errs.LastError("SetTimer")
 					}
 
 					tv.SetCurrentIndex(int(nmlv.IItem))
@@ -2668,7 +2669,7 @@ func (tv *TableView) WndProc(hwnd handle.HWND, msg uint32, wp, lp uintptr) uintp
 
 	case user32.WM_TIMER:
 		if !user32.KillTimer(tv.hWnd, wp) {
-			lastError("KillTimer")
+			errs.LastError("KillTimer")
 		}
 
 		switch wp {

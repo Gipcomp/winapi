@@ -21,6 +21,7 @@ import (
 	"github.com/Gipcomp/win32/uxtheme"
 	"github.com/Gipcomp/win32/win"
 	"github.com/Gipcomp/win32/winuser"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type ListBox struct {
@@ -129,7 +130,7 @@ func NewListBoxWithStyle(parent Container, style uint32) (*ListBox, error) {
 				if lb.model == nil {
 					return nil
 				} else {
-					return newError("Data binding is only supported using a model that implements BindingValueProvider.")
+					return errs.NewError("Data binding is only supported using a model that implements BindingValueProvider.")
 				}
 			}
 
@@ -215,19 +216,19 @@ func (lb *ListBox) insertItemAt(index int) error {
 	str := lb.itemString(index)
 	strPtr, err := syscall.UTF16PtrFromString(str)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	lp := uintptr(unsafe.Pointer(strPtr))
 	ret := int(lb.SendMessage(winuser.LB_INSERTSTRING, uintptr(index), lp))
 	if ret == winuser.LB_ERRSPACE || ret == winuser.LB_ERR {
-		return newError("SendMessage(LB_INSERTSTRING)")
+		return errs.NewError("SendMessage(LB_INSERTSTRING)")
 	}
 	return nil
 }
 
 func (lb *ListBox) removeItem(index int) error {
 	if winuser.LB_ERR == int(lb.SendMessage(winuser.LB_DELETESTRING, uintptr(index), 0)) {
-		return newError("SendMessage(LB_DELETESTRING)")
+		return errs.NewError("SendMessage(LB_DELETESTRING)")
 	}
 
 	return nil
@@ -327,7 +328,7 @@ func (lb *ListBox) attachModel() {
 
 	itemChangedHandler := func(index int) {
 		if commctrl.CB_ERR == lb.SendMessage(winuser.LB_DELETESTRING, uintptr(index), 0) {
-			newError("SendMessage(CB_DELETESTRING)")
+			errs.NewError("SendMessage(CB_DELETESTRING)")
 		}
 
 		lb.insertItemAt(index)
@@ -457,7 +458,7 @@ func (lb *ListBox) BindingMember() string {
 func (lb *ListBox) SetBindingMember(bindingMember string) error {
 	if bindingMember != "" {
 		if _, ok := lb.providedModel.([]string); ok {
-			return newError("invalid for []string model")
+			return errs.NewError("invalid for []string model")
 		}
 	}
 
@@ -498,7 +499,7 @@ func (lb *ListBox) DisplayMember() string {
 func (lb *ListBox) SetDisplayMember(displayMember string) error {
 	if displayMember != "" {
 		if _, ok := lb.providedModel.([]string); ok {
-			return newError("invalid for []string model")
+			return errs.NewError("invalid for []string model")
 		}
 	}
 
@@ -531,7 +532,7 @@ func (lb *ListBox) SetPrecision(value int) {
 func (lb *ListBox) calculateMaxItemTextWidth() int {
 	hdc := user32.GetDC(lb.hWnd)
 	if hdc == 0 {
-		newError("GetDC failed")
+		errs.NewError("GetDC failed")
 		return -1
 	}
 	defer user32.ReleaseDC(lb.hWnd, hdc)
@@ -550,11 +551,11 @@ func (lb *ListBox) calculateMaxItemTextWidth() int {
 		var s gdi32.SIZE
 		str, err := syscall.UTF16FromString(item)
 		if err != nil {
-			newError(err.Error())
+			errs.NewError(err.Error())
 		}
 
 		if !gdi32.GetTextExtentPoint32(hdc, &str[0], int32(len(str)-1), &s) {
-			newError("GetTextExtentPoint32 failed")
+			errs.NewError("GetTextExtentPoint32 failed")
 			return -1
 		}
 
@@ -597,7 +598,7 @@ func (lb *ListBox) CurrentIndex() int {
 
 func (lb *ListBox) SetCurrentIndex(value int) error {
 	if value > -1 && winuser.LB_ERR == int(int32(lb.SendMessage(winuser.LB_SETCURSEL, uintptr(value), 0))) {
-		return newError("Invalid index or ensure lb is single-selection listbox")
+		return errs.NewError("Invalid index or ensure lb is single-selection listbox")
 	}
 
 	if value != lb.prevCurIndex {
@@ -689,7 +690,7 @@ func (lb *ListBox) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr)
 		if !lb.style.highContrastActive {
 			strPtr, err := syscall.UTF16PtrFromString("Listview")
 			if err != nil {
-				newError(err.Error())
+				errs.NewError(err.Error())
 			}
 			if hTheme = uxtheme.OpenThemeData(lb.hWnd, strPtr); hTheme != 0 {
 				defer uxtheme.CloseThemeData(hTheme)

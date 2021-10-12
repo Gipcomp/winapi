@@ -13,6 +13,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const iniFileTimeStampFormat = "2006-01-02"
@@ -56,15 +58,15 @@ func (ifs *IniFileSettings) PutExpiring(key, value string) error {
 
 func (ifs *IniFileSettings) put(key, value string, expiring bool) error {
 	if key == "" {
-		return newError("key must not be empty")
+		return errs.NewError("key must not be empty")
 	}
 	// if strings.IndexAny(key, "|=\r\n") > -1 {
 	if strings.ContainsAny(key, "|=\r\n") {
-		return newError("key contains at least one of the invalid characters '|=\\r\\n'")
+		return errs.NewError("key contains at least one of the invalid characters '|=\\r\\n'")
 	}
 	// if strings.IndexAny(value, "\r\n") > -1 {
 	if strings.ContainsAny(value, "\r\n") {
-		return newError("value contains at least one of the invalid characters '\\r\\n'")
+		return errs.NewError("value contains at least one of the invalid characters '\\r\\n'")
 	}
 
 	var timestamp time.Time
@@ -137,12 +139,12 @@ func (ifs *IniFileSettings) withFile(flags int, f func(file *os.File) error) err
 
 	dirPath, _ := filepath.Split(filePath)
 	if err := os.MkdirAll(dirPath, 0644); err != nil {
-		return wrapError(err)
+		return errs.WrapError(err)
 	}
 
 	file, err := os.OpenFile(filePath, flags, 0644)
 	if err != nil {
-		return wrapError(err)
+		return errs.WrapError(err)
 	}
 	defer file.Close()
 
@@ -167,7 +169,7 @@ func (ifs *IniFileSettings) Load() error {
 
 			assignIndex := strings.Index(line, "=")
 			if assignIndex == -1 {
-				return newError("bad line format: missing '='")
+				return errs.NewError("bad line format: missing '='")
 			}
 
 			key := strings.TrimSpace(line[:assignIndex])
@@ -207,24 +209,24 @@ func (ifs *IniFileSettings) Save() error {
 			record := ifs.key2Record[key]
 
 			if _, err := bufWriter.WriteString(key); err != nil {
-				return wrapError(err)
+				return errs.WrapError(err)
 			}
 			if !record.timestamp.IsZero() {
 				if _, err := bufWriter.WriteString("|"); err != nil {
-					return wrapError(err)
+					return errs.WrapError(err)
 				}
 				if _, err := bufWriter.WriteString(record.timestamp.Format(iniFileTimeStampFormat)); err != nil {
-					return wrapError(err)
+					return errs.WrapError(err)
 				}
 			}
 			if _, err := bufWriter.WriteString("="); err != nil {
-				return wrapError(err)
+				return errs.WrapError(err)
 			}
 			if _, err := bufWriter.WriteString(record.value); err != nil {
-				return wrapError(err)
+				return errs.WrapError(err)
 			}
 			if _, err := bufWriter.WriteString("\r\n"); err != nil {
-				return wrapError(err)
+				return errs.WrapError(err)
 			}
 		}
 

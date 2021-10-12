@@ -16,6 +16,7 @@ import (
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
 	"github.com/Gipcomp/win32/winuser"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type TextEdit struct {
@@ -255,7 +256,7 @@ func (te *TextEdit) ReadOnly() bool {
 
 func (te *TextEdit) SetReadOnly(readOnly bool) error {
 	if te.SendMessage(winuser.EM_SETREADONLY, uintptr(win.BoolToBOOL(readOnly)), 0) == 0 {
-		return newError("SendMessage(EM_SETREADONLY)")
+		return errs.NewError("SendMessage(EM_SETREADONLY)")
 	}
 
 	te.readOnlyChangedPublisher.Publish()

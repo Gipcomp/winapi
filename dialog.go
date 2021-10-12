@@ -12,6 +12,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const (
@@ -97,7 +98,7 @@ func (dlg *Dialog) DefaultButton() *PushButton {
 
 func (dlg *Dialog) SetDefaultButton(button *PushButton) error {
 	if button != nil && !user32.IsChild(dlg.hWnd, button.hWnd) {
-		return newError("not a descendant of the dialog")
+		return errs.NewError("not a descendant of the dialog")
 	}
 
 	succeeded := false
@@ -131,7 +132,7 @@ func (dlg *Dialog) CancelButton() *PushButton {
 
 func (dlg *Dialog) SetCancelButton(button *PushButton) error {
 	if button != nil && !user32.IsChild(dlg.hWnd, button.hWnd) {
-		return newError("not a descendant of the dialog")
+		return errs.NewError("not a descendant of the dialog")
 	}
 
 	dlg.cancelButton = button

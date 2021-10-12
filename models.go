@@ -14,6 +14,7 @@ import (
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/uxtheme"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 // BindingValueProvider is the interface that a model must implement to support
@@ -450,7 +451,7 @@ func (lis *ListItemStyle) DrawBackground() error {
 
 	if lis.hTheme != 0 && stateID != uxtheme.LISS_NORMAL {
 		if win.FAILED(uxtheme.DrawThemeBackground(lis.hTheme, lis.hdc, uxtheme.LVP_LISTITEM, stateID, &lis.rc, nil)) {
-			return newError("DrawThemeBackground failed")
+			return errs.NewError("DrawThemeBackground failed")
 		}
 	} else {
 		brush, err := NewSolidColorBrush(lis.BackgroundColor)
@@ -492,7 +493,7 @@ func (lis *ListItemStyle) DrawText(text string, bounds Rectangle, format DrawTex
 			return err
 		}
 		if win.FAILED(uxtheme.DrawThemeTextEx(lis.hTheme, lis.hdc, uxtheme.LVP_LISTITEM, lis.stateID(), strPtr, int32(len(([]rune)(text))), uint32(format), &rc, nil)) {
-			return newError("DrawThemeTextEx failed")
+			return errs.NewError("DrawThemeTextEx failed")
 		}
 	} else {
 		if canvas := lis.Canvas(); canvas != nil {

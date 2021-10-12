@@ -6,6 +6,8 @@
 
 package winapi
 
+import "github.com/Gipcomp/winapi/errs"
+
 type actionChangedHandler interface {
 	onActionChanged(action *Action) error
 	onActionVisibleChanged(action *Action) error
@@ -129,7 +131,7 @@ func (a *Action) SetChecked(value bool) (err error) {
 				return err
 			}
 		} else {
-			return newError("CheckedCondition != nil")
+			return errs.NewError("CheckedCondition != nil")
 		}
 	}
 
@@ -184,7 +186,7 @@ func (a *Action) SetDefault(value bool) (err error) {
 				return err
 			}
 		} else {
-			return newError("DefaultCondition != nil")
+			return errs.NewError("DefaultCondition != nil")
 		}
 	}
 
@@ -234,7 +236,7 @@ func (a *Action) Enabled() bool {
 
 func (a *Action) SetEnabled(value bool) (err error) {
 	if a.enabledCondition != nil {
-		return newError("EnabledCondition != nil")
+		return errs.NewError("EnabledCondition != nil")
 	}
 
 	if value != a.enabled {
@@ -393,7 +395,7 @@ func (a *Action) Visible() bool {
 
 func (a *Action) SetVisible(value bool) (err error) {
 	if a.visibleCondition != nil {
-		return newError("VisibleCondition != nil")
+		return errs.NewError("VisibleCondition != nil")
 	}
 
 	if value != a.visible {

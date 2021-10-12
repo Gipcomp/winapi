@@ -13,6 +13,7 @@ import (
 	"github.com/Gipcomp/win32/kernel32"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type FontStyle byte
@@ -58,7 +59,7 @@ type Font struct {
 // NewFont returns a new Font with the specified attributes.
 func NewFont(family string, pointSize int, style FontStyle) (*Font, error) {
 	if style > FontBold|FontItalic|FontUnderline|FontStrikeOut {
-		return nil, newError("invalid style")
+		return nil, errs.NewError("invalid style")
 	}
 
 	fi := fontInfo{
@@ -84,7 +85,7 @@ func NewFont(family string, pointSize int, style FontStyle) (*Font, error) {
 
 func newFontFromLOGFONT(lf *gdi32.LOGFONT, dpi int) (*Font, error) {
 	if lf == nil {
-		return nil, newError("lf cannot be nil")
+		return nil, errs.NewError("lf cannot be nil")
 	}
 
 	family := win.UTF16PtrToString(&lf.LfFaceName[0])
@@ -135,7 +136,7 @@ func (f *Font) createForDPI(dpi int) (gdi32.HFONT, error) {
 	lf.LfPitchAndFamily = gdi32.VARIABLE_PITCH | gdi32.FF_SWISS
 	strUtf, err := syscall.UTF16FromString(f.family)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	src := strUtf
 	dest := lf.LfFaceName[:]
@@ -143,7 +144,7 @@ func (f *Font) createForDPI(dpi int) (gdi32.HFONT, error) {
 
 	hFont := gdi32.CreateFontIndirect(&lf)
 	if hFont == 0 {
-		return 0, newError("CreateFontIndirect failed")
+		return 0, errs.NewError("CreateFontIndirect failed")
 	}
 
 	return hFont, nil

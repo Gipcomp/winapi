@@ -14,22 +14,6 @@ var (
 	ErrInvalidType = errors.New("invalid type")
 )
 
-func LogErrors() bool {
-	return logErrors
-}
-
-func SetLogErrors(v bool) {
-	logErrors = v
-}
-
-func PanicOnError() bool {
-	return panicOnError
-}
-
-func SetPanicOnError(v bool) {
-	panicOnError = v
-}
-
 func TranslationFunc() TranslationFunction {
 	return translation
 }

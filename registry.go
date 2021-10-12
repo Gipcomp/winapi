@@ -12,6 +12,7 @@ import (
 
 	"github.com/Gipcomp/win32/advapi32"
 	"github.com/Gipcomp/win32/kernel32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type RegistryKey struct {
@@ -43,7 +44,7 @@ func RegistryKeyString(rootKey *RegistryKey, subKeyPath, valueName string) (valu
 		advapi32.KEY_READ,
 		&hKey) != kernel32.ERROR_SUCCESS {
 
-		return "", newError("RegistryKeyString: Failed to open subkey.")
+		return "", errs.NewError("RegistryKeyString: Failed to open subkey.")
 	}
 	defer advapi32.RegCloseKey(hKey)
 
@@ -62,7 +63,7 @@ func RegistryKeyString(rootKey *RegistryKey, subKeyPath, valueName string) (valu
 		nil,
 		&bufSize) {
 
-		return "", newError("RegQueryValueEx #1")
+		return "", errs.NewError("RegQueryValueEx #1")
 	}
 
 	data = make([]uint16, bufSize/2+1)
@@ -75,7 +76,7 @@ func RegistryKeyString(rootKey *RegistryKey, subKeyPath, valueName string) (valu
 		(*byte)(unsafe.Pointer(&data[0])),
 		&bufSize) {
 
-		return "", newError("RegQueryValueEx #2")
+		return "", errs.NewError("RegQueryValueEx #2")
 	}
 
 	return syscall.UTF16ToString(data), nil
@@ -94,7 +95,7 @@ func RegistryKeyUint32(rootKey *RegistryKey, subKeyPath, valueName string) (valu
 		advapi32.KEY_READ,
 		&hKey) != kernel32.ERROR_SUCCESS {
 
-		return 0, newError("RegistryKeyUint32: Failed to open subkey.")
+		return 0, errs.NewError("RegistryKeyUint32: Failed to open subkey.")
 	}
 	defer advapi32.RegCloseKey(hKey)
 
@@ -111,7 +112,7 @@ func RegistryKeyUint32(rootKey *RegistryKey, subKeyPath, valueName string) (valu
 		(*byte)(unsafe.Pointer(&value)),
 		&bufSize) {
 
-		return 0, newError("RegQueryValueEx")
+		return 0, errs.NewError("RegQueryValueEx")
 	}
 
 	return

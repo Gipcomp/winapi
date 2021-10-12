@@ -18,6 +18,7 @@ import (
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/uxtheme"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const tabWidgetWindowClass = `\o/ Walk_TabWidget_Class \o/`
@@ -71,7 +72,7 @@ func NewTabWidget(parent Container) (*TabWidget, error) {
 		user32.WS_CHILD|user32.WS_CLIPSIBLINGS|user32.WS_TABSTOP|user32.WS_VISIBLE,
 		0, 0, 0, 0, tw.hWnd, 0, 0, nil)
 	if tw.hWndTab == 0 {
-		return nil, lastError("CreateWindowEx")
+		return nil, errs.LastError("CreateWindowEx")
 	}
 
 	user32.SetWindowLongPtr(tw.hWndTab, user32.GWLP_USERDATA, uintptr(unsafe.Pointer(tw)))
@@ -168,12 +169,12 @@ func (tw *TabWidget) SetCurrentIndex(index int) error {
 	}
 
 	if index < 0 || index >= tw.pages.Len() {
-		return newError("invalid index")
+		return errs.NewError("invalid index")
 	}
 
 	ret := int(user32.SendMessage(tw.hWndTab, commctrl.TCM_SETCURSEL, uintptr(index), 0))
 	if ret == -1 {
-		return newError("SendMessage(TCM_SETCURSEL) failed")
+		return errs.NewError("SendMessage(TCM_SETCURSEL) failed")
 	}
 
 	// FIXME: The SendMessage(TCM_SETCURSEL) call above doesn't cause a
@@ -251,7 +252,7 @@ func (tw *TabWidget) resizePages() {
 func (tw *TabWidget) pageBounds() Rectangle {
 	var r gdi32.RECT
 	if !user32.GetWindowRect(tw.hWndTab, &r) {
-		lastError("GetWindowRect")
+		errs.LastError("GetWindowRect")
 		return Rectangle{}
 	}
 
@@ -260,7 +261,7 @@ func (tw *TabWidget) pageBounds() Rectangle {
 		Y: r.Top,
 	}
 	if !user32.ScreenToClient(tw.hWnd, &p) {
-		newError("ScreenToClient failed")
+		errs.NewError("ScreenToClient failed")
 		return Rectangle{}
 	}
 
@@ -283,7 +284,7 @@ func (tw *TabWidget) pageBounds() Rectangle {
 
 func (tw *TabWidget) onResize(width, height int32) {
 	if !user32.MoveWindow(tw.hWndTab, 0, 0, width, height, true) {
-		lastError("MoveWindow")
+		errs.LastError("MoveWindow")
 		return
 	}
 
@@ -488,13 +489,13 @@ func tabWidgetTabWndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) u
 
 				title, err := syscall.UTF16FromString(page.title)
 				if err != nil {
-					newError(err.Error())
+					errs.NewError(err.Error())
 				}
 
 				if themed {
 					tab, err := syscall.UTF16PtrFromString("tab")
 					if err != nil {
-						newError(err.Error())
+						errs.NewError(err.Error())
 					}
 					hTheme := uxtheme.OpenThemeData(hwnd, tab)
 					defer uxtheme.CloseThemeData(hTheme)
@@ -527,7 +528,7 @@ func (tw *TabWidget) onPageChanged(page *TabPage) (err error) {
 	item := tw.tcitemFromPage(page)
 
 	if user32.SendMessage(tw.hWndTab, commctrl.TCM_SETITEM, uintptr(index), uintptr(unsafe.Pointer(item))) == 0 {
-		return newError("SendMessage(TCM_SETITEM) failed")
+		return errs.NewError("SendMessage(TCM_SETITEM) failed")
 	}
 
 	tw.updateNonClientSize()
@@ -543,14 +544,14 @@ func (tw *TabWidget) onInsertedPage(index int, page *TabPage) (err error) {
 	item := tw.tcitemFromPage(page)
 
 	if idx := int(user32.SendMessage(tw.hWndTab, commctrl.TCM_INSERTITEM, uintptr(index), uintptr(unsafe.Pointer(item)))); idx == -1 {
-		return newError("SendMessage(TCM_INSERTITEM) failed")
+		return errs.NewError("SendMessage(TCM_INSERTITEM) failed")
 	}
 
 	page.SetVisible(false)
 
 	style := uint32(user32.GetWindowLong(page.hWnd, user32.GWL_STYLE))
 	if style == 0 {
-		return lastError("GetWindowLong")
+		return errs.LastError("GetWindowLong")
 	}
 
 	style |= user32.WS_CHILD
@@ -558,11 +559,11 @@ func (tw *TabWidget) onInsertedPage(index int, page *TabPage) (err error) {
 
 	kernel32.SetLastError(0)
 	if user32.SetWindowLong(page.hWnd, user32.GWL_STYLE, int32(style)) == 0 {
-		return lastError("SetWindowLong")
+		return errs.LastError("SetWindowLong")
 	}
 
 	if user32.SetParent(page.hWnd, tw.hWnd) == 0 {
-		return lastError("SetParent")
+		return errs.LastError("SetParent")
 	}
 
 	if tw.pages.Len() == 1 {
@@ -586,7 +587,7 @@ func (tw *TabWidget) removePage(page *TabPage) (err error) {
 
 	style := uint32(user32.GetWindowLong(page.hWnd, user32.GWL_STYLE))
 	if style == 0 {
-		return lastError("GetWindowLong")
+		return errs.LastError("GetWindowLong")
 	}
 
 	style &^= user32.WS_CHILD
@@ -594,7 +595,7 @@ func (tw *TabWidget) removePage(page *TabPage) (err error) {
 
 	kernel32.SetLastError(0)
 	if user32.SetWindowLong(page.hWnd, user32.GWL_STYLE, int32(style)) == 0 {
-		return lastError("SetWindowLong")
+		return errs.LastError("SetWindowLong")
 	}
 
 	page.tabWidget = nil
@@ -672,7 +673,7 @@ func (tw *TabWidget) tcitemFromPage(page *TabPage) *commctrl.TCITEM {
 
 	text, err := syscall.UTF16FromString(page.title)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 
 	item := &commctrl.TCITEM{

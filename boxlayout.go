@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type Orientation byte
@@ -60,7 +61,7 @@ func (l *BoxLayout) SetOrientation(value Orientation) error {
 		case Horizontal, Vertical:
 
 		default:
-			return newError("invalid Orientation value")
+			return errs.NewError("invalid Orientation value")
 		}
 
 		l.orientation = value
@@ -82,16 +83,16 @@ func (l *BoxLayout) StretchFactor(widget Widget) int {
 func (l *BoxLayout) SetStretchFactor(widget Widget, factor int) error {
 	if factor != l.StretchFactor(widget) {
 		if l.container == nil {
-			return newError("container required")
+			return errs.NewError("container required")
 		}
 
 		handle := widget.Handle()
 
 		if !l.container.Children().containsHandle(handle) {
-			return newError("unknown widget")
+			return errs.NewError("unknown widget")
 		}
 		if factor < 1 {
-			return newError("factor must be >= 1")
+			return errs.NewError("factor must be >= 1")
 		}
 
 		l.hwnd2StretchFactor[handle] = factor

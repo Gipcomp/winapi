@@ -15,6 +15,7 @@ import (
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
 	"github.com/Gipcomp/win32/winuser"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type CaseMode uint32
@@ -78,7 +79,7 @@ func newLineEdit(parent Window) (*LineEdit, error) {
 
 func NewLineEdit(parent Container) (*LineEdit, error) {
 	if parent == nil {
-		return nil, newError("parent cannot be nil")
+		return nil, errs.NewError("parent cannot be nil")
 	}
 
 	le, err := newLineEdit(parent)
@@ -106,7 +107,7 @@ func NewLineEdit(parent Container) (*LineEdit, error) {
 func (le *LineEdit) CueBanner() string {
 	buf := make([]uint16, 128)
 	if win.FALSE == le.SendMessage(winuser.EM_GETCUEBANNER, uintptr(unsafe.Pointer(&buf[0])), uintptr(len(buf))) {
-		newError("EM_GETCUEBANNER failed")
+		errs.NewError("EM_GETCUEBANNER failed")
 		return ""
 	}
 
@@ -116,10 +117,10 @@ func (le *LineEdit) CueBanner() string {
 func (le *LineEdit) SetCueBanner(value string) error {
 	strPtr, err := syscall.UTF16PtrFromString(value)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	if win.FALSE == le.SendMessage(winuser.EM_SETCUEBANNER, win.FALSE, uintptr(unsafe.Pointer(strPtr))) {
-		return newError("EM_SETCUEBANNER failed")
+		return errs.NewError("EM_SETCUEBANNER failed")
 	}
 
 	return nil
@@ -236,7 +237,7 @@ func (le *LineEdit) ReadOnly() bool {
 
 func (le *LineEdit) SetReadOnly(readOnly bool) error {
 	if le.SendMessage(winuser.EM_SETREADONLY, uintptr(win.BoolToBOOL(readOnly)), 0) == 0 {
-		return newError("SendMessage(EM_SETREADONLY)")
+		return errs.NewError("SendMessage(EM_SETREADONLY)")
 	}
 
 	if readOnly != le.ReadOnly() {
@@ -270,7 +271,7 @@ func (le *LineEdit) initCharWidth() {
 
 	hdc := user32.GetDC(le.hWnd)
 	if hdc == 0 {
-		newError("GetDC failed")
+		errs.NewError("GetDC failed")
 		return
 	}
 	defer user32.ReleaseDC(le.hWnd, hdc)
@@ -281,7 +282,7 @@ func (le *LineEdit) initCharWidth() {
 
 	var s gdi32.SIZE
 	if !gdi32.GetTextExtentPoint32(hdc, &buf[0], int32(len(buf)), &s) {
-		newError("GetTextExtentPoint32 failed")
+		errs.NewError("GetTextExtentPoint32 failed")
 		return
 	}
 	le.charWidth = int(s.CX)

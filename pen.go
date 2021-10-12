@@ -8,6 +8,7 @@ package winapi
 
 import (
 	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type PenStyle int
@@ -108,7 +109,7 @@ func NewCosmeticPen(style PenStyle, color Color) (*CosmeticPen, error) {
 
 	hPen := gdi32.ExtCreatePen(uint32(style), 1, lb, 0, nil)
 	if hPen == 0 {
-		return nil, newError("ExtCreatePen failed")
+		return nil, errs.NewError("ExtCreatePen failed")
 	}
 
 	return &CosmeticPen{hPen: hPen, style: style, color: color}, nil
@@ -148,7 +149,7 @@ type GeometricPen struct {
 // NewGeometricPen prepares new geometric pen. width parameter is specified in 1/96" units.
 func NewGeometricPen(style PenStyle, width int, brush Brush) (*GeometricPen, error) {
 	if brush == nil {
-		return nil, newError("brush cannot be nil")
+		return nil, errs.NewError("brush cannot be nil")
 	}
 
 	style |= gdi32.PS_GEOMETRIC
@@ -188,7 +189,7 @@ func (p *GeometricPen) handleForDPIWithError(dpi int) (gdi32.HPEN, error) {
 		uint32(IntFrom96DPI(p.width96dpi, dpi)),
 		p.brush.logbrush(), 0, nil)
 	if hPen == 0 {
-		return 0, newError("ExtCreatePen failed")
+		return 0, errs.NewError("ExtCreatePen failed")
 	}
 
 	p.dpi2hPen[dpi] = hPen

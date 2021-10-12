@@ -19,6 +19,7 @@ import (
 	"github.com/Gipcomp/win32/kernel32"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type CloseReason byte
@@ -43,17 +44,17 @@ func init() {
 	AppendToWalkInit(func() {
 		strPtr, err := syscall.UTF16PtrFromString("WalkSync")
 		if err != nil {
-			newError(err.Error())
+			errs.NewError(err.Error())
 		}
 		syncMsgId = user32.RegisterWindowMessage(strPtr)
 		strPtr, err = syscall.UTF16PtrFromString("TaskbarButtonCreated")
 		if err != nil {
-			newError(err.Error())
+			errs.NewError(err.Error())
 		}
 		taskbarButtonCreatedMsgId = user32.RegisterWindowMessage(strPtr)
 		strPtr, err = syscall.UTF16PtrFromString("TaskbarCreated")
 		if err != nil {
-			newError(err.Error())
+			errs.NewError(err.Error())
 		}
 		taskbarCreatedMsgId = user32.RegisterWindowMessage(strPtr)
 	})
@@ -206,7 +207,7 @@ func (fb *FormBase) Layout() Layout {
 
 func (fb *FormBase) SetLayout(value Layout) error {
 	if fb.clientComposite == nil {
-		return newError("clientComposite not initialized")
+		return errs.NewError("clientComposite not initialized")
 	}
 
 	return fb.clientComposite.SetLayout(value)
@@ -498,7 +499,7 @@ func (fb *FormBase) Deactivating() *Event {
 
 func (fb *FormBase) Activate() error {
 	if hwndPrevActive := user32.SetActiveWindow(fb.hWnd); hwndPrevActive == 0 {
-		return lastError("SetActiveWindow")
+		return errs.LastError("SetActiveWindow")
 	}
 
 	return nil
@@ -522,7 +523,7 @@ func (fb *FormBase) SetOwner(value Form) error {
 		user32.GWL_HWNDPARENT,
 		int32(ownerHWnd)) == 0 && kernel32.GetLastError() != 0 {
 
-		return lastError("SetWindowLong")
+		return errs.LastError("SetWindowLong")
 	}
 
 	return nil
@@ -618,7 +619,7 @@ func (fb *FormBase) SaveState() error {
 	wp.Length = uint32(unsafe.Sizeof(wp))
 
 	if !user32.GetWindowPlacement(fb.hWnd, &wp) {
-		return lastError("GetWindowPlacement")
+		return errs.LastError("GetWindowPlacement")
 	}
 
 	state := fmt.Sprint(
@@ -674,7 +675,7 @@ func (fb *FormBase) RestoreState() error {
 	}
 
 	if !user32.SetWindowPlacement(fb.hWnd, &wp) {
-		return lastError("SetWindowPlacement")
+		return errs.LastError("SetWindowPlacement")
 	}
 
 	return fb.clientComposite.RestoreState()
@@ -752,7 +753,7 @@ func (fb *FormBase) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr
 			if fb.owner != nil {
 				user32.EnableWindow(fb.owner.Handle(), true)
 				if !user32.SetWindowPos(fb.owner.Handle(), user32.HWND_NOTOPMOST, 0, 0, 0, 0, user32.SWP_NOMOVE|user32.SWP_NOSIZE|user32.SWP_SHOWWINDOW) {
-					lastError("SetWindowPos")
+					errs.LastError("SetWindowPos")
 				}
 			}
 

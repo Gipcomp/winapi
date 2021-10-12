@@ -10,6 +10,7 @@ import (
 	"sort"
 
 	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type splitterLayout struct {
@@ -80,7 +81,7 @@ func (l *splitterLayout) Spacing() int {
 }
 
 func (l *splitterLayout) SetSpacing(value int) error {
-	return newError("not supported")
+	return errs.NewError("not supported")
 }
 
 func (l *splitterLayout) Orientation() Orientation {
@@ -93,7 +94,7 @@ func (l *splitterLayout) SetOrientation(value Orientation) error {
 		case Horizontal, Vertical:
 
 		default:
-			return newError("invalid Orientation value")
+			return errs.NewError("invalid Orientation value")
 		}
 
 		l.orientation = value
@@ -121,11 +122,11 @@ func (l *splitterLayout) StretchFactor(widget Widget) int {
 func (l *splitterLayout) SetStretchFactor(widget Widget, factor int) error {
 	if factor != l.StretchFactor(widget) {
 		if factor < 1 {
-			return newError("factor must be >= 1")
+			return errs.NewError("factor must be >= 1")
 		}
 
 		if l.container == nil {
-			return newError("container required")
+			return errs.NewError("container required")
 		}
 
 		item := l.hwnd2Item[widget.Handle()]

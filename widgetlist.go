@@ -6,7 +6,10 @@
 
 package winapi
 
-import "github.com/Gipcomp/win32/handle"
+import (
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/winapi/errs"
+)
 
 type widgetListObserver interface {
 	onInsertingWidget(index int, widget Widget) error
@@ -98,7 +101,7 @@ func (l *WidgetList) insertIntoSlice(index int, item Widget) {
 
 func (l *WidgetList) Insert(index int, item Widget) error {
 	if l.Contains(item) {
-		return newError("cannot insert same widget multiple times")
+		return errs.NewError("cannot insert same widget multiple times")
 	}
 
 	observer := l.observer

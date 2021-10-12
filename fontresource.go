@@ -13,6 +13,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/kernel32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 // FontMemResource represents a font resource loaded into memory from
@@ -24,34 +25,34 @@ type FontMemResource struct {
 func newFontMemResource(resourceName *uint16) (*FontMemResource, error) {
 	hModule := kernel32.HMODULE(kernel32.GetModuleHandle(nil))
 	if hModule == kernel32.HMODULE(0) {
-		return nil, lastError("GetModuleHandle")
+		return nil, errs.LastError("GetModuleHandle")
 	}
 
 	hres := kernel32.FindResource(hModule, resourceName, win.MAKEINTRESOURCE(8) /*RT_FONT*/)
 	if hres == kernel32.HRSRC(0) {
-		return nil, lastError("FindResource")
+		return nil, errs.LastError("FindResource")
 	}
 
 	size := kernel32.SizeofResource(hModule, hres)
 	if size == 0 {
-		return nil, lastError("SizeofResource")
+		return nil, errs.LastError("SizeofResource")
 	}
 
 	hResLoad := kernel32.LoadResource(hModule, hres)
 	if hResLoad == kernel32.HGLOBAL(0) {
-		return nil, lastError("LoadResource")
+		return nil, errs.LastError("LoadResource")
 	}
 
 	ptr := kernel32.LockResource(hResLoad)
 	if ptr == 0 {
-		return nil, lastError("LockResource")
+		return nil, errs.LastError("LockResource")
 	}
 
 	numFonts := uint32(0)
 	hFontResource := gdi32.AddFontMemResourceEx(ptr, size, nil, &numFonts)
 
 	if hFontResource == handle.HANDLE(0) || numFonts == 0 {
-		return nil, lastError("AddFontMemResource")
+		return nil, errs.LastError("AddFontMemResource")
 	}
 
 	return &FontMemResource{hFontResource: hFontResource}, nil

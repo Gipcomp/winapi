@@ -6,7 +6,11 @@
 
 package winapi
 
-import "math"
+import (
+	"math"
+
+	"github.com/Gipcomp/winapi/errs"
+)
 
 var (
 	borderGlowAlpha = []float64{0.2, 0.1, 0.075, 0.05, 0.075}
@@ -202,7 +206,7 @@ func newWidgetGraphicsEffectList(observer widgetGraphicsEffectListObserver) *Wid
 
 func (l *WidgetGraphicsEffectList) Add(effect WidgetGraphicsEffect) error {
 	if effect == nil {
-		return newError("effect == nil")
+		return errs.NewError("effect == nil")
 	}
 
 	return l.Insert(len(l.items), effect)

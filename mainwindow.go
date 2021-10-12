@@ -11,6 +11,7 @@ import (
 
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const mainWindowWindowClass = `\o/ Walk_MainWindow_Class \o/`
@@ -71,7 +72,7 @@ func NewMainWindowWithCfg(cfg *MainWindowCfg) (*MainWindow, error) {
 		return nil, err
 	}
 	if !user32.SetMenu(mw.hWnd, mw.menu.hMenu) {
-		return nil, lastError("SetMenu")
+		return nil, errs.LastError("SetMenu")
 	}
 
 	tb, err := NewToolBar(mw)
@@ -181,12 +182,12 @@ func (mw *MainWindow) SetFullscreen(fullscreen bool) error {
 		}
 
 		if !user32.GetWindowPlacement(mw.hWnd, mw.windowPlacement) {
-			return lastError("GetWindowPlacement")
+			return errs.LastError("GetWindowPlacement")
 		}
 		if !user32.GetMonitorInfo(user32.MonitorFromWindow(
 			mw.hWnd, user32.MONITOR_DEFAULTTOPRIMARY), &mi) {
 
-			return newError("GetMonitorInfo")
+			return errs.NewError("GetMonitorInfo")
 		}
 
 		if err := mw.ensureStyleBits(user32.WS_OVERLAPPEDWINDOW, false); err != nil {
@@ -198,7 +199,7 @@ func (mw *MainWindow) SetFullscreen(fullscreen bool) error {
 			r.Left, r.Top, r.Right-r.Left, r.Bottom-r.Top,
 			user32.SWP_FRAMECHANGED|user32.SWP_NOOWNERZORDER) {
 
-			return lastError("SetWindowPos")
+			return errs.LastError("SetWindowPos")
 		}
 	} else {
 		if err := mw.ensureStyleBits(user32.WS_OVERLAPPEDWINDOW, true); err != nil {
@@ -206,13 +207,13 @@ func (mw *MainWindow) SetFullscreen(fullscreen bool) error {
 		}
 
 		if !user32.SetWindowPlacement(mw.hWnd, mw.windowPlacement) {
-			return lastError("SetWindowPlacement")
+			return errs.LastError("SetWindowPlacement")
 		}
 
 		if !user32.SetWindowPos(mw.hWnd, 0, 0, 0, 0, 0, user32.SWP_FRAMECHANGED|user32.SWP_NOMOVE|
 			user32.SWP_NOOWNERZORDER|user32.SWP_NOSIZE|user32.SWP_NOZORDER) {
 
-			return lastError("SetWindowPos")
+			return errs.LastError("SetWindowPos")
 		}
 	}
 

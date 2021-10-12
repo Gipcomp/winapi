@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const milimeterPerMeter float64 = 1000.0
@@ -26,7 +27,7 @@ type Metafile struct {
 func NewMetafile(referenceCanvas *Canvas) (*Metafile, error) {
 	hdc := gdi32.CreateEnhMetaFile(referenceCanvas.hdc, nil, nil, nil)
 	if hdc == 0 {
-		return nil, newError("CreateEnhMetaFile failed")
+		return nil, errs.NewError("CreateEnhMetaFile failed")
 	}
 
 	return &Metafile{hdc: hdc}, nil
@@ -39,7 +40,7 @@ func NewMetafileFromFile(filePath string) (*Metafile, error) {
 	}
 	hemf := gdi32.GetEnhMetaFile(strPtr)
 	if hemf == 0 {
-		return nil, newError("GetEnhMetaFile failed")
+		return nil, errs.NewError("GetEnhMetaFile failed")
 	}
 
 	mf := &Metafile{hemf: hemf}
@@ -69,7 +70,7 @@ func (mf *Metafile) Save(filePath string) error {
 	}
 	hemf := gdi32.CopyEnhMetaFile(mf.hemf, strPtr)
 	if hemf == 0 {
-		return newError("CopyEnhMetaFile failed")
+		return errs.NewError("CopyEnhMetaFile failed")
 	}
 
 	gdi32.DeleteEnhMetaFile(hemf)
@@ -81,7 +82,7 @@ func (mf *Metafile) readSizeFromHeader() error {
 	var hdr gdi32.ENHMETAHEADER
 
 	if gdi32.GetEnhMetaFileHeader(mf.hemf, uint32(unsafe.Sizeof(hdr)), &hdr) == 0 {
-		return newError("GetEnhMetaFileHeader failed")
+		return errs.NewError("GetEnhMetaFileHeader failed")
 	}
 
 	mf.size = sizeFromRECT(hdr.RclBounds)
@@ -97,7 +98,7 @@ func (mf *Metafile) readSizeFromHeader() error {
 func (mf *Metafile) ensureFinished() error {
 	if mf.hdc == 0 {
 		if mf.hemf == 0 {
-			return newError("already disposed")
+			return errs.NewError("already disposed")
 		} else {
 			return nil
 		}
@@ -105,7 +106,7 @@ func (mf *Metafile) ensureFinished() error {
 
 	mf.hemf = gdi32.CloseEnhMetaFile(mf.hdc)
 	if mf.hemf == 0 {
-		return newError("CloseEnhMetaFile failed")
+		return errs.NewError("CloseEnhMetaFile failed")
 	}
 
 	mf.hdc = 0
@@ -129,7 +130,7 @@ func (mf *Metafile) drawStretched(hdc gdi32.HDC, bounds Rectangle) error {
 	rc := bounds.toRECT()
 
 	if !gdi32.PlayEnhMetaFile(hdc, mf.hemf, &rc) {
-		return newError("PlayEnhMetaFile failed")
+		return errs.NewError("PlayEnhMetaFile failed")
 	}
 
 	return nil

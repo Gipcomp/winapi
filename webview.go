@@ -18,6 +18,7 @@ import (
 	"github.com/Gipcomp/win32/shdocvw"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const webViewWindowClass = `\o/ Walk_WebView_Class \o/`
@@ -71,7 +72,7 @@ type WebView struct {
 
 func NewWebView(parent Container) (*WebView, error) {
 	if hr := ole32.OleInitialize(); hr != win.S_OK && hr != win.S_FALSE {
-		return nil, newError(fmt.Sprint("OleInitialize Error: ", hr))
+		return nil, errs.NewError(fmt.Sprint("OleInitialize Error: ", hr))
 	}
 
 	wv := &WebView{
@@ -125,57 +126,57 @@ func NewWebView(parent Container) (*WebView, error) {
 
 	var classFactoryPtr unsafe.Pointer
 	if hr := ole32.CoGetClassObject(&shdocvw.CLSID_WebBrowser, ole32.CLSCTX_INPROC_HANDLER|ole32.CLSCTX_INPROC_SERVER, nil, &ole32.IID_IClassFactory, &classFactoryPtr); win.FAILED(hr) {
-		return nil, errorFromHRESULT("CoGetClassObject", hr)
+		return nil, errs.ErrorFromHRESULT("CoGetClassObject", hr)
 	}
 	classFactory := (*ole32.IClassFactory)(classFactoryPtr)
 	defer classFactory.Release()
 
 	var browserObjectPtr unsafe.Pointer
 	if hr := classFactory.CreateInstance(nil, &ole32.IID_IOleObject, &browserObjectPtr); win.FAILED(hr) {
-		return nil, errorFromHRESULT("IClassFactory.CreateInstance", hr)
+		return nil, errs.ErrorFromHRESULT("IClassFactory.CreateInstance", hr)
 	}
 	browserObject := (*ole32.IOleObject)(browserObjectPtr)
 
 	wv.browserObject = browserObject
 
 	if hr := browserObject.SetClientSite((*ole32.IOleClientSite)(unsafe.Pointer(&wv.clientSite))); win.FAILED(hr) {
-		return nil, errorFromHRESULT("IOleObject.SetClientSite", hr)
+		return nil, errs.ErrorFromHRESULT("IOleObject.SetClientSite", hr)
 	}
 	strPtr, err := syscall.UTF16PtrFromString("Walk.WebView")
 	if err != nil {
 		return nil, err
 	}
 	if hr := browserObject.SetHostNames(strPtr, nil); win.FAILED(hr) {
-		return nil, errorFromHRESULT("IOleObject.SetHostNames", hr)
+		return nil, errs.ErrorFromHRESULT("IOleObject.SetHostNames", hr)
 	}
 
 	if hr := ole32.OleSetContainedObject((*ole32.IUnknown)(unsafe.Pointer(browserObject)), true); win.FAILED(hr) {
-		return nil, errorFromHRESULT("OleSetContainedObject", hr)
+		return nil, errs.ErrorFromHRESULT("OleSetContainedObject", hr)
 	}
 
 	var rect gdi32.RECT
 	user32.GetClientRect(wv.hWnd, &rect)
 
 	if hr := browserObject.DoVerb(ole32.OLEIVERB_SHOW, nil, (*ole32.IOleClientSite)(unsafe.Pointer(&wv.clientSite)), 0, wv.hWnd, &rect); win.FAILED(hr) {
-		return nil, errorFromHRESULT("IOleObject.DoVerb", hr)
+		return nil, errs.ErrorFromHRESULT("IOleObject.DoVerb", hr)
 	}
 
 	var cpcPtr unsafe.Pointer
 	if hr := browserObject.QueryInterface(&ole32.IID_IConnectionPointContainer, &cpcPtr); win.FAILED(hr) {
-		return nil, errorFromHRESULT("IOleObject.QueryInterface(IID_IConnectionPointContainer)", hr)
+		return nil, errs.ErrorFromHRESULT("IOleObject.QueryInterface(IID_IConnectionPointContainer)", hr)
 	}
 	cpc := (*ole32.IConnectionPointContainer)(cpcPtr)
 	defer cpc.Release()
 
 	var cp *ole32.IConnectionPoint
 	if hr := cpc.FindConnectionPoint(&shdocvw.DIID_DWebBrowserEvents2, &cp); win.FAILED(hr) {
-		return nil, errorFromHRESULT("IConnectionPointContainer.FindConnectionPoint(DIID_DWebBrowserEvents2)", hr)
+		return nil, errs.ErrorFromHRESULT("IConnectionPointContainer.FindConnectionPoint(DIID_DWebBrowserEvents2)", hr)
 	}
 	defer cp.Release()
 
 	var cookie uint32
 	if hr := cp.Advise(unsafe.Pointer(&wv.clientSite.webBrowserEvents2), &cookie); win.FAILED(hr) {
-		return nil, errorFromHRESULT("IConnectionPoint.Advise", hr)
+		return nil, errs.ErrorFromHRESULT("IConnectionPoint.Advise", hr)
 	}
 
 	wv.onResize()
@@ -232,7 +233,7 @@ func (wv *WebView) URL() (url string, err error) {
 	err = wv.withWebBrowser2(func(webBrowser2 *shdocvw.IWebBrowser2) error {
 		var urlBstr *uint16 /*BSTR*/
 		if hr := webBrowser2.Get_LocationURL(&urlBstr); win.FAILED(hr) {
-			return errorFromHRESULT("IWebBrowser2.Get_LocationURL", hr)
+			return errs.ErrorFromHRESULT("IWebBrowser2.Get_LocationURL", hr)
 		}
 		defer oleaut32.SysFreeString(urlBstr)
 
@@ -251,7 +252,7 @@ func (wv *WebView) SetURL(url string) error {
 		targetFrameName := oleaut32.StringToVariantBSTR("_self")
 
 		if hr := webBrowser2.Navigate2(urlBstr, flags, targetFrameName, nil, nil); win.FAILED(hr) {
-			return errorFromHRESULT("IWebBrowser2.Navigate2", hr)
+			return errs.ErrorFromHRESULT("IWebBrowser2.Navigate2", hr)
 		}
 
 		return nil
@@ -411,7 +412,7 @@ func (wv *WebView) DocumentTitleChanged() *Event {
 func (wv *WebView) Refresh() error {
 	return wv.withWebBrowser2(func(webBrowser2 *shdocvw.IWebBrowser2) error {
 		if hr := webBrowser2.Refresh(); win.FAILED(hr) {
-			return errorFromHRESULT("IWebBrowser2.Refresh", hr)
+			return errs.ErrorFromHRESULT("IWebBrowser2.Refresh", hr)
 		}
 
 		return nil
@@ -421,7 +422,7 @@ func (wv *WebView) Refresh() error {
 func (wv *WebView) withWebBrowser2(f func(webBrowser2 *shdocvw.IWebBrowser2) error) error {
 	var webBrowser2Ptr unsafe.Pointer
 	if hr := wv.browserObject.QueryInterface(&shdocvw.IID_IWebBrowser2, &webBrowser2Ptr); win.FAILED(hr) {
-		return errorFromHRESULT("IOleObject.QueryInterface", hr)
+		return errs.ErrorFromHRESULT("IOleObject.QueryInterface", hr)
 	}
 	webBrowser2 := (*shdocvw.IWebBrowser2)(webBrowser2Ptr)
 	defer webBrowser2.Release()
@@ -450,7 +451,7 @@ func (wv *WebView) withInPlaceActiveObject(f func(activeObject *shdocvw.IOleInPl
 	wv.withWebBrowser2(func(webBrowser2 *shdocvw.IWebBrowser2) error {
 		var activeObjectPtr unsafe.Pointer
 		if hr := webBrowser2.QueryInterface(&shdocvw.IID_IOleInPlaceActiveObject, &activeObjectPtr); win.FAILED(hr) {
-			return errorFromHRESULT("WebBowser2.QueryInterface", hr)
+			return errs.ErrorFromHRESULT("WebBowser2.QueryInterface", hr)
 		}
 		activeObject := (*shdocvw.IOleInPlaceActiveObject)(activeObjectPtr)
 		defer activeObject.Release()

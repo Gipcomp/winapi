@@ -11,6 +11,7 @@ import (
 
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 func createLayoutItemForWidget(widget Widget) LayoutItem {
@@ -302,7 +303,7 @@ func applyLayoutResults(results []LayoutResult, stopwatch *stopwatch) error {
 
 		hdwp := user32.BeginDeferWindowPos(int32(len(result.items)))
 		if hdwp == 0 {
-			return lastError("BeginDeferWindowPos")
+			return errs.LastError("BeginDeferWindowPos")
 		}
 
 		var maybeInvalidate bool
@@ -369,7 +370,7 @@ func applyLayoutResults(results []LayoutResult, stopwatch *stopwatch) error {
 					int32(ri.Bounds.Height),
 					user32.SWP_NOACTIVATE|user32.SWP_NOOWNERZORDER|user32.SWP_NOZORDER); hdwp == 0 {
 
-					return lastError("DeferWindowPos")
+					return errs.LastError("DeferWindowPos")
 				}
 
 				if widget.GraphicsEffects().Len() == 0 {
@@ -381,7 +382,7 @@ func applyLayoutResults(results []LayoutResult, stopwatch *stopwatch) error {
 		}
 
 		if !user32.EndDeferWindowPos(hdwp) {
-			return lastError("EndDeferWindowPos")
+			return errs.LastError("EndDeferWindowPos")
 		}
 	}
 
@@ -461,7 +462,7 @@ func (l *LayoutBase) SetMargins(value Margins) error {
 	}
 
 	if value.HNear < 0 || value.VNear < 0 || value.HFar < 0 || value.VFar < 0 {
-		return newError("margins must be positive")
+		return errs.NewError("margins must be positive")
 	}
 
 	l.margins96dpi = value
@@ -485,7 +486,7 @@ func (l *LayoutBase) SetSpacing(value int) error {
 	}
 
 	if value < 0 {
-		return newError("spacing cannot be negative")
+		return errs.NewError("spacing cannot be negative")
 	}
 
 	l.spacing96dpi = value
@@ -518,7 +519,7 @@ func (l *LayoutBase) Alignment() Alignment2D {
 func (l *LayoutBase) SetAlignment(alignment Alignment2D) error {
 	if alignment != l.alignment {
 		if alignment < AlignHVDefault || alignment > AlignHFarVFar {
-			return newError("invalid Alignment value")
+			return errs.NewError("invalid Alignment value")
 		}
 
 		l.alignment = alignment

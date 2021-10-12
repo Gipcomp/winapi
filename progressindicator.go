@@ -15,6 +15,7 @@ import (
 	"github.com/Gipcomp/win32/shobj"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type ProgressIndicator struct {
@@ -41,7 +42,7 @@ const (
 func newTaskbarList3(hwnd handle.HWND) (*ProgressIndicator, error) {
 	var classFactoryPtr unsafe.Pointer
 	if hr := ole32.CoGetClassObject(&shobj.CLSID_TaskbarList, ole32.CLSCTX_ALL, nil, &ole32.IID_IClassFactory, &classFactoryPtr); win.FAILED(hr) {
-		return nil, errorFromHRESULT("CoGetClassObject", hr)
+		return nil, errs.ErrorFromHRESULT("CoGetClassObject", hr)
 	}
 
 	var taskbarList3ObjectPtr unsafe.Pointer
@@ -49,7 +50,7 @@ func newTaskbarList3(hwnd handle.HWND) (*ProgressIndicator, error) {
 	defer classFactory.Release()
 
 	if hr := classFactory.CreateInstance(nil, &shobj.IID_ITaskbarList3, &taskbarList3ObjectPtr); win.FAILED(hr) {
-		return nil, errorFromHRESULT("IClassFactory.CreateInstance", hr)
+		return nil, errs.ErrorFromHRESULT("IClassFactory.CreateInstance", hr)
 	}
 
 	return &ProgressIndicator{taskbarList3: (*shobj.ITaskbarList3)(taskbarList3ObjectPtr), hwnd: hwnd}, nil
@@ -57,7 +58,7 @@ func newTaskbarList3(hwnd handle.HWND) (*ProgressIndicator, error) {
 
 func (pi *ProgressIndicator) SetState(state PIState) error {
 	if hr := pi.taskbarList3.SetProgressState(pi.hwnd, (int)(state)); win.FAILED(hr) {
-		return errorFromHRESULT("ITaskbarList3.setprogressState", hr)
+		return errs.ErrorFromHRESULT("ITaskbarList3.setprogressState", hr)
 	}
 	pi.state = state
 	return nil
@@ -77,7 +78,7 @@ func (pi *ProgressIndicator) Total() uint32 {
 
 func (pi *ProgressIndicator) SetCompleted(completed uint32) error {
 	if hr := pi.taskbarList3.SetProgressValue(pi.hwnd, completed, pi.total); win.FAILED(hr) {
-		return errorFromHRESULT("ITaskbarList3.SetProgressValue", hr)
+		return errs.ErrorFromHRESULT("ITaskbarList3.SetProgressValue", hr)
 	}
 	pi.completed = completed
 	return nil
@@ -97,7 +98,7 @@ func (pi *ProgressIndicator) SetOverlayIcon(icon *Icon, description string) erro
 		description16 = &[]uint16{0}[0]
 	}
 	if hr := pi.taskbarList3.SetOverlayIcon(pi.hwnd, handle, description16); win.FAILED(hr) {
-		return errorFromHRESULT("ITaskbarList3.SetOverlayIcon", hr)
+		return errs.ErrorFromHRESULT("ITaskbarList3.SetOverlayIcon", hr)
 	}
 	pi.overlayIcon = icon
 	pi.overlayIconDescription = description

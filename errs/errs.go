@@ -4,7 +4,7 @@
 
 // +build windows
 
-package winapi
+package errs
 
 import (
 	"fmt"
@@ -24,6 +24,22 @@ type Error struct {
 	inner   error
 	message string
 	stack   []byte
+}
+
+func LogErrors() bool {
+	return logErrors
+}
+
+func SetLogErrors(v bool) {
+	logErrors = v
+}
+
+func PanicOnError() bool {
+	return panicOnError
+}
+
+func SetPanicOnError(v bool) {
+	panicOnError = v
 }
 
 func (err *Error) Inner() error {
@@ -80,24 +96,24 @@ func newErr(message string) error {
 	return &Error{message: message, stack: debug.Stack()}
 }
 
-func newError(message string) error {
+func NewError(message string) error {
 	return processError(newErr(message))
 }
 
-func newErrorNoPanic(message string) error {
+func NewErrorNoPanic(message string) error {
 	return processErrorNoPanic(newErr(message))
 }
 
-func lastError(win32FuncName string) error {
+func LastError(win32FuncName string) error {
 	if errno := kernel32.GetLastError(); errno != kernel32.ERROR_SUCCESS {
-		return newError(fmt.Sprintf("%s: Error %d", win32FuncName, errno))
+		return NewError(fmt.Sprintf("%s: Error %d", win32FuncName, errno))
 	}
 
-	return newError(win32FuncName)
+	return NewError(win32FuncName)
 }
 
-func errorFromHRESULT(funcName string, hr win.HRESULT) error {
-	return newError(fmt.Sprintf("%s: Error %d", funcName, hr))
+func ErrorFromHRESULT(funcName string, hr win.HRESULT) error {
+	return NewError(fmt.Sprintf("%s: Error %d", funcName, hr))
 }
 
 func wrapErr(err error) error {
@@ -108,11 +124,11 @@ func wrapErr(err error) error {
 	return &Error{inner: err, stack: debug.Stack()}
 }
 
-func wrapErrorNoPanic(err error) error {
+func WrapErrorNoPanic(err error) error {
 	return processErrorNoPanic(wrapErr(err))
 }
 
-func wrapError(err error) error {
+func WrapError(err error) error {
 	return processError(wrapErr(err))
 }
 
@@ -122,13 +138,13 @@ func toErrorNoPanic(x interface{}) error {
 		return x
 
 	case error:
-		return wrapErrorNoPanic(x)
+		return WrapErrorNoPanic(x)
 
 	case string:
-		return newErrorNoPanic(x)
+		return NewErrorNoPanic(x)
 	}
 
-	return newErrorNoPanic(fmt.Sprintf("Error: %v", x))
+	return NewErrorNoPanic(fmt.Sprintf("Error: %v", x))
 }
 
 func toError(x interface{}) error {

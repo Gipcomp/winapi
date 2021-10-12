@@ -12,6 +12,7 @@ import (
 
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type MsgBoxStyle uint
@@ -57,11 +58,11 @@ func MsgBox(owner Form, title, message string, style MsgBoxStyle) int {
 	}
 	messagePtr, err := syscall.UTF16PtrFromString(strings.ReplaceAll(message, "\x00", "␀"))
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	titlePtr, err := syscall.UTF16PtrFromString(strings.ReplaceAll(title, "\x00", "␀"))
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	return int(user32.MessageBox(
 		ownerHWnd,

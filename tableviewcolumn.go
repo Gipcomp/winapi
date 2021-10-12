@@ -14,6 +14,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 // TableViewColumn represents a column in a TableView.
@@ -408,7 +409,7 @@ func (tvc *TableViewColumn) create() error {
 	}
 
 	if -1 == int(tvc.sendMessage(commctrl.LVM_INSERTCOLUMN, uintptr(index), uintptr(unsafe.Pointer(&lvc)))) {
-		return newError("LVM_INSERTCOLUMN")
+		return errs.NewError("LVM_INSERTCOLUMN")
 	}
 
 	tvc.tv.updateLVSizes()
@@ -420,7 +421,7 @@ func (tvc *TableViewColumn) destroy() error {
 	width := tvc.Width()
 
 	if win.FALSE == tvc.sendMessage(commctrl.LVM_DELETECOLUMN, uintptr(tvc.indexInListView()), 0) {
-		return newError("LVM_DELETECOLUMN")
+		return errs.NewError("LVM_DELETECOLUMN")
 	}
 
 	tvc.width = width
@@ -438,7 +439,7 @@ func (tvc *TableViewColumn) update() error {
 	lvc := tvc.getLVCOLUMN()
 
 	if win.FALSE == tvc.sendMessage(commctrl.LVM_SETCOLUMN, uintptr(tvc.indexInListView()), uintptr(unsafe.Pointer(lvc))) {
-		return newError("LVM_SETCOLUMN")
+		return errs.NewError("LVM_SETCOLUMN")
 	}
 
 	tvc.tv.updateLVSizes()
@@ -462,7 +463,7 @@ func (tvc *TableViewColumn) getLVCOLUMN() *commctrl.LVCOLUMN {
 	var err error
 	lvc.PszText, err = syscall.UTF16PtrFromString(tvc.TitleEffective())
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	lvc.Cx = int32(width)
 

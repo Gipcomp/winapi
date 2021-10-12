@@ -11,6 +11,7 @@ import (
 
 	"github.com/Gipcomp/win32/gdi32"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type HatchStyle int
@@ -176,7 +177,7 @@ func init() {
 func NewSystemColorBrush(sysColor SystemColor) (*SystemColorBrush, error) {
 	hBrush := user32.GetSysColorBrush(int(sysColor))
 	if hBrush == 0 {
-		return nil, newError("GetSysColorBrush failed")
+		return nil, errs.NewError("GetSysColorBrush failed")
 	}
 
 	return &SystemColorBrush{brushBase: brushBase{hBrush: hBrush}, sysColor: sysColor}, nil
@@ -215,7 +216,7 @@ func NewSolidColorBrush(color Color) (*SolidColorBrush, error) {
 
 	hBrush := gdi32.CreateBrushIndirect(lb)
 	if hBrush == 0 {
-		return nil, newError("CreateBrushIndirect failed")
+		return nil, errs.NewError("CreateBrushIndirect failed")
 	}
 
 	return &SolidColorBrush{brushBase: brushBase{hBrush: hBrush}, color: color}, nil
@@ -244,7 +245,7 @@ func NewHatchBrush(color Color, style HatchStyle) (*HatchBrush, error) {
 
 	hBrush := gdi32.CreateBrushIndirect(lb)
 	if hBrush == 0 {
-		return nil, newError("CreateBrushIndirect failed")
+		return nil, errs.NewError("CreateBrushIndirect failed")
 	}
 
 	return &HatchBrush{brushBase: brushBase{hBrush: hBrush}, color: color, style: style}, nil
@@ -273,12 +274,12 @@ type BitmapBrush struct {
 
 func NewBitmapBrush(bitmap *Bitmap) (*BitmapBrush, error) {
 	if bitmap == nil {
-		return nil, newError("bitmap cannot be nil")
+		return nil, errs.NewError("bitmap cannot be nil")
 	}
 
 	hBrush := gdi32.CreatePatternBrush(bitmap.hBmp)
 	if hBrush == 0 {
-		return nil, newError("CreatePatternBrush failed")
+		return nil, errs.NewError("CreatePatternBrush failed")
 	}
 
 	return &BitmapBrush{brushBase: brushBase{hBrush: hBrush}, bitmap: bitmap}, nil
@@ -340,7 +341,7 @@ func NewVerticalGradientBrush(stops []GradientStop) (*GradientBrush, error) {
 
 func newGradientBrushWithOrientation(stops []GradientStop, orientation gradientOrientation) (*GradientBrush, error) {
 	if len(stops) < 2 {
-		return nil, newError("at least 2 stops are required")
+		return nil, errs.NewError("at least 2 stops are required")
 	}
 
 	var vertexes []GradientVertex
@@ -372,11 +373,11 @@ func newGradientBrushWithOrientation(stops []GradientStop, orientation gradientO
 
 func NewGradientBrush(vertexes []GradientVertex, triangles []GradientTriangle) (*GradientBrush, error) {
 	if len(vertexes) < 3 {
-		return nil, newError("at least 3 vertexes are required")
+		return nil, errs.NewError("at least 3 vertexes are required")
 	}
 
 	if len(triangles) < 1 {
-		return nil, newError("at least 1 triangle is required")
+		return nil, errs.NewError("at least 1 triangle is required")
 	}
 
 	return newGradientBrush(vertexes, triangles, gradientOrientationNone)
@@ -468,7 +469,7 @@ func (b *GradientBrush) create(size Size) (*BitmapBrush, error) {
 	}
 
 	if !gdi32.GradientFill(canvas.hdc, &vertexes[0], uint32(len(vertexes)), unsafe.Pointer(&triangles[0]), uint32(len(triangles)), gdi32.GRADIENT_FILL_TRIANGLE) {
-		return nil, newError("GradientFill failed")
+		return nil, errs.NewError("GradientFill failed")
 	}
 
 	disposables.Spare()

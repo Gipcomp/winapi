@@ -14,6 +14,7 @@ import (
 	"github.com/Gipcomp/win32/kernel32"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const clipboardWindowClass = `\o/ Walk_Clipboard_Class \o/`
@@ -41,7 +42,7 @@ func init() {
 		}
 
 		if !user32.AddClipboardFormatListener(hwnd) {
-			lastError("AddClipboardFormatListener")
+			errs.LastError("AddClipboardFormatListener")
 		}
 
 		clipboard.hwnd = hwnd
@@ -81,7 +82,7 @@ func (c *ClipboardService) ContentsChanged() *Event {
 func (c *ClipboardService) Clear() error {
 	return c.withOpenClipboard(func() error {
 		if !user32.EmptyClipboard() {
-			return lastError("EmptyClipboard")
+			return errs.LastError("EmptyClipboard")
 		}
 
 		return nil
@@ -104,12 +105,12 @@ func (c *ClipboardService) Text() (text string, err error) {
 	err = c.withOpenClipboard(func() error {
 		hMem := kernel32.HGLOBAL(user32.GetClipboardData(user32.CF_UNICODETEXT))
 		if hMem == 0 {
-			return lastError("GetClipboardData")
+			return errs.LastError("GetClipboardData")
 		}
 
 		p := kernel32.GlobalLock(hMem)
 		if p == nil {
-			return lastError("GlobalLock()")
+			return errs.LastError("GlobalLock()")
 		}
 		defer kernel32.GlobalUnlock(hMem)
 
@@ -131,12 +132,12 @@ func (c *ClipboardService) SetText(s string) error {
 
 		hMem := kernel32.GlobalAlloc(kernel32.GMEM_MOVEABLE, uintptr(len(utf16)*2))
 		if hMem == 0 {
-			return lastError("GlobalAlloc")
+			return errs.LastError("GlobalAlloc")
 		}
 
 		p := kernel32.GlobalLock(hMem)
 		if p == nil {
-			return lastError("GlobalLock()")
+			return errs.LastError("GlobalLock()")
 		}
 
 		kernel32.MoveMemory(p, unsafe.Pointer(&utf16[0]), uintptr(len(utf16)*2))
@@ -147,7 +148,7 @@ func (c *ClipboardService) SetText(s string) error {
 			// We need to free hMem.
 			defer kernel32.GlobalFree(hMem)
 
-			return lastError("SetClipboardData")
+			return errs.LastError("SetClipboardData")
 		}
 
 		// The system now owns the memory referred to by hMem.
@@ -158,7 +159,7 @@ func (c *ClipboardService) SetText(s string) error {
 
 func (c *ClipboardService) withOpenClipboard(f func() error) error {
 	if !user32.OpenClipboard(c.hwnd) {
-		return lastError("OpenClipboard")
+		return errs.LastError("OpenClipboard")
 	}
 	defer user32.CloseClipboard()
 

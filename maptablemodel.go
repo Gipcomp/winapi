@@ -8,6 +8,8 @@ package winapi
 
 import (
 	"sort"
+
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type mapTableModel struct {
@@ -21,7 +23,7 @@ type mapTableModel struct {
 func newMapTableModel(dataSource interface{}) (TableModel, error) {
 	items, ok := dataSource.([]map[string]interface{})
 	if !ok {
-		return nil, newError("dataSource must be assignable to []map[string]interface{}")
+		return nil, errs.NewError("dataSource must be assignable to []map[string]interface{}")
 	}
 
 	return &mapTableModel{dataSource: dataSource, items: items}, nil

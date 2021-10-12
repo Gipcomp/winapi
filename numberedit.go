@@ -21,6 +21,7 @@ import (
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
 	"github.com/Gipcomp/win32/winuser"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const numberEditWindowClass = `\o/ Walk_NumberEdit_Class \o/`
@@ -165,7 +166,7 @@ func (ne *NumberEdit) Decimals() int {
 // SetDecimals sets the number of decimal places in the NumberEdit.
 func (ne *NumberEdit) SetDecimals(decimals int) error {
 	if decimals < 0 || decimals > 8 {
-		return newError("decimals must >= 0 && <= 8")
+		return errs.NewError("decimals must >= 0 && <= 8")
 	}
 
 	ne.edit.decimals = decimals
@@ -272,7 +273,7 @@ func (ne *NumberEdit) MaxValue() float64 {
 // If the current value is out of this range, it will be adjusted.
 func (ne *NumberEdit) SetRange(min, max float64) error {
 	if min > max {
-		return newError(fmt.Sprintf("invalid range - min: %f, max: %f", min, max))
+		return errs.NewError(fmt.Sprintf("invalid range - min: %f, max: %f", min, max))
 	}
 
 	minChanged := min != ne.edit.minValue
@@ -312,7 +313,7 @@ func (ne *NumberEdit) SetValue(value float64) error {
 	if ne.edit.minValue != ne.edit.maxValue &&
 		(value < ne.edit.minValue || value > ne.edit.maxValue) {
 
-		return newError("value out of range")
+		return errs.NewError("value out of range")
 	}
 
 	return ne.edit.setValue(value, true)
@@ -326,7 +327,7 @@ func (ne *NumberEdit) ValueChanged() *Event {
 // SetFocus sets the keyboard input focus to the NumberEdit.
 func (ne *NumberEdit) SetFocus() error {
 	if user32.SetFocus(ne.edit.hWnd) == 0 {
-		return lastError("SetFocus")
+		return errs.LastError("SetFocus")
 	}
 
 	return nil
@@ -387,13 +388,13 @@ func (ne *NumberEdit) SetSpinButtonsVisible(visible bool) error {
 			0,
 			nil)
 		if ne.hWndUpDown == 0 {
-			return lastError("CreateWindowEx")
+			return errs.LastError("CreateWindowEx")
 		}
 
 		user32.SendMessage(ne.hWndUpDown, commctrl.UDM_SETBUDDY, uintptr(ne.edit.hWnd), 0)
 	} else {
 		if !user32.DestroyWindow(ne.hWndUpDown) {
-			return lastError("DestroyWindow")
+			return errs.LastError("DestroyWindow")
 		}
 
 		ne.hWndUpDown = 0

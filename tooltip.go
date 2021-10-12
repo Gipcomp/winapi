@@ -14,6 +14,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/bb760416(v=vs.85).aspx says 80,
@@ -101,7 +102,7 @@ func (tt *ToolTip) setTitle(title string, icon uintptr) error {
 		return err
 	}
 	if win.FALSE == tt.SendMessage(commctrl.TTM_SETTITLE, icon, uintptr(unsafe.Pointer(strPtr))) {
-		return newError("TTM_SETTITLE failed")
+		return errs.NewError("TTM_SETTITLE failed")
 	}
 
 	return nil
@@ -122,7 +123,7 @@ func (tt *ToolTip) track(tool Widget) error {
 
 	ti := tt.toolInfo(tool.Handle())
 	if ti == nil {
-		return newError("unknown tool")
+		return errs.NewError("unknown tool")
 	}
 
 	tt.SendMessage(commctrl.TTM_TRACKACTIVATE, 1, uintptr(unsafe.Pointer(ti)))
@@ -154,7 +155,7 @@ func (tt *ToolTip) track(tool Widget) error {
 func (tt *ToolTip) untrack(tool Widget) error {
 	ti := tt.toolInfo(tool.Handle())
 	if ti == nil {
-		return newError("unknown tool")
+		return errs.NewError("unknown tool")
 	}
 
 	tt.SendMessage(commctrl.TTM_TRACKACTIVATE, 0, uintptr(unsafe.Pointer(ti)))
@@ -187,7 +188,7 @@ func (tt *ToolTip) addTool(hwnd handle.HWND, track bool) error {
 	ti.UId = uintptr(hwnd)
 
 	if win.FALSE == tt.SendMessage(commctrl.TTM_ADDTOOL, 0, uintptr(unsafe.Pointer(&ti))) {
-		return newError("TTM_ADDTOOL failed")
+		return errs.NewError("TTM_ADDTOOL failed")
 	}
 
 	return nil
@@ -228,7 +229,7 @@ func (tt *ToolTip) SetText(tool Widget, text string) error {
 func (tt *ToolTip) setText(hwnd handle.HWND, text string) error {
 	ti := tt.toolInfo(hwnd)
 	if ti == nil {
-		return newError("unknown tool")
+		return errs.NewError("unknown tool")
 	}
 
 	n := 0

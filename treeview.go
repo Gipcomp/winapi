@@ -15,6 +15,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type treeViewItemInfo struct {
@@ -62,7 +63,7 @@ func NewTreeView(parent Container) (*TreeView, error) {
 	}()
 
 	if hr := win.HRESULT(tv.SendMessage(commctrl.TVM_SETEXTENDEDSTYLE, commctrl.TVS_EX_DOUBLEBUFFER, commctrl.TVS_EX_DOUBLEBUFFER)); win.FAILED(hr) {
-		return nil, errorFromHRESULT("TVM_SETEXTENDEDSTYLE", hr)
+		return nil, errs.ErrorFromHRESULT("TVM_SETEXTENDEDSTYLE", hr)
 	}
 
 	if err := tv.setTheme("Explorer"); err != nil {
@@ -225,7 +226,7 @@ func (tv *TreeView) SetCurrentItem(item TreeItem) error {
 	}
 
 	if tv.SendMessage(commctrl.TVM_SELECTITEM, commctrl.TVGN_CARET, uintptr(handle)) == 0 {
-		return newError("SendMessage(TVM_SELECTITEM) failed")
+		return errs.NewError("SendMessage(TVM_SELECTITEM) failed")
 	}
 
 	tv.currItem = item
@@ -247,13 +248,13 @@ func (tv *TreeView) EnsureVisible(item TreeItem) error {
 func (tv *TreeView) handleForItem(item TreeItem) (commctrl.HTREEITEM, error) {
 	if item != nil {
 		if info := tv.item2Info[item]; info == nil {
-			return 0, newError("invalid item")
+			return 0, errs.NewError("invalid item")
 		} else {
 			return info.handle, nil
 		}
 	}
 
-	return 0, newError("invalid item")
+	return 0, errs.NewError("invalid item")
 }
 
 // ItemAt determines the location of the specified point in native pixels relative to the client area of a tree-view control.
@@ -300,7 +301,7 @@ func (tv *TreeView) resetItems() error {
 
 func (tv *TreeView) clearItems() error {
 	if tv.SendMessage(commctrl.TVM_DELETEITEM, 0, 0) == 0 {
-		return newError("SendMessage(TVM_DELETEITEM) failed")
+		return errs.NewError("SendMessage(TVM_DELETEITEM) failed")
 	}
 
 	tv.item2Info = make(map[TreeItem]*treeViewItemInfo)
@@ -387,7 +388,7 @@ func (tv *TreeView) insertItemAfter(item TreeItem, hInsertAfter commctrl.HTREEIT
 	} else {
 		info := tv.item2Info[parent]
 		if info == nil {
-			return 0, newError("invalid parent")
+			return 0, errs.NewError("invalid parent")
 		}
 		tvins.HParent = info.handle
 	}
@@ -396,7 +397,7 @@ func (tv *TreeView) insertItemAfter(item TreeItem, hInsertAfter commctrl.HTREEIT
 
 	hItem := commctrl.HTREEITEM(tv.SendMessage(commctrl.TVM_INSERTITEM, 0, uintptr(unsafe.Pointer(&tvins))))
 	if hItem == 0 {
-		return 0, newError("TVM_INSERTITEM failed")
+		return 0, errs.NewError("TVM_INSERTITEM failed")
 	}
 	tv.item2Info[item] = &treeViewItemInfo{hItem, make(map[TreeItem]commctrl.HTREEITEM)}
 	tv.handle2Item[hItem] = item
@@ -436,7 +437,7 @@ func (tv *TreeView) updateItem(item TreeItem) error {
 	tv.setTVITEMImageInfo(tvi, item)
 
 	if tv.SendMessage(commctrl.TVM_SETITEM, 0, uintptr(unsafe.Pointer(tvi))) == 0 {
-		return newError("SendMessage(TVM_SETITEM) failed")
+		return errs.NewError("SendMessage(TVM_SETITEM) failed")
 	}
 
 	return nil
@@ -449,11 +450,11 @@ func (tv *TreeView) removeItem(item TreeItem) error {
 
 	info := tv.item2Info[item]
 	if info == nil {
-		return newError("invalid item")
+		return errs.NewError("invalid item")
 	}
 
 	if tv.SendMessage(commctrl.TVM_DELETEITEM, 0, uintptr(info.handle)) == 0 {
-		return newError("SendMessage(TVM_DELETEITEM) failed")
+		return errs.NewError("SendMessage(TVM_DELETEITEM) failed")
 	}
 
 	if parentInfo := tv.item2Info[item.Parent()]; parentInfo != nil {
@@ -477,7 +478,7 @@ func (tv *TreeView) removeDescendants(parent TreeItem) error {
 
 func (tv *TreeView) ensureItemAndAncestorsInserted(item TreeItem) error {
 	if item == nil {
-		return newError("invalid item")
+		return errs.NewError("invalid item")
 	}
 
 	tv.SetSuspended(true)
@@ -491,7 +492,7 @@ func (tv *TreeView) ensureItemAndAncestorsInserted(item TreeItem) error {
 		if item != nil {
 			hierarchy = append(hierarchy, item)
 		} else {
-			return newError("invalid item")
+			return errs.NewError("invalid item")
 		}
 	}
 
@@ -516,7 +517,7 @@ func (tv *TreeView) Expanded(item TreeItem) bool {
 	}
 
 	if tv.SendMessage(commctrl.TVM_GETITEM, 0, uintptr(unsafe.Pointer(tvi))) == 0 {
-		newError("SendMessage(TVM_GETITEM) failed")
+		errs.NewError("SendMessage(TVM_GETITEM) failed")
 	}
 
 	return tvi.State&commctrl.TVIS_EXPANDED != 0
@@ -531,7 +532,7 @@ func (tv *TreeView) SetExpanded(item TreeItem, expanded bool) error {
 
 	info := tv.item2Info[item]
 	if info == nil {
-		return newError("invalid item")
+		return errs.NewError("invalid item")
 	}
 
 	var action uintptr
@@ -542,7 +543,7 @@ func (tv *TreeView) SetExpanded(item TreeItem, expanded bool) error {
 	}
 
 	if 0 == tv.SendMessage(commctrl.TVM_EXPAND, action, uintptr(info.handle)) {
-		return newError("SendMessage(TVM_EXPAND) failed")
+		return errs.NewError("SendMessage(TVM_EXPAND) failed")
 	}
 
 	return nil
@@ -579,7 +580,7 @@ func (tv *TreeView) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr
 				text := item.Text()
 				utf16, err := syscall.UTF16FromString(text)
 				if err != nil {
-					newError(err.Error())
+					errs.NewError(err.Error())
 				}
 				buf := (*[264]uint16)(unsafe.Pointer(nmtvdi.Item.PszText))
 				max := mini(len(utf16), int(nmtvdi.Item.CchTextMax))

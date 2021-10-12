@@ -6,6 +6,8 @@
 
 package winapi
 
+import "github.com/Gipcomp/winapi/errs"
+
 type TableViewColumnList struct {
 	tv    *TableView
 	items []*TableViewColumn
@@ -73,7 +75,7 @@ func (l *TableViewColumnList) Contains(item *TableViewColumn) bool {
 // same time.
 func (l *TableViewColumnList) Insert(index int, item *TableViewColumn) error {
 	if item.tv != nil {
-		return newError("duplicate insert")
+		return errs.NewError("duplicate insert")
 	}
 
 	item.tv = l.tv

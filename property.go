@@ -9,6 +9,8 @@ package winapi
 import (
 	"errors"
 	"fmt"
+
+	"github.com/Gipcomp/winapi/errs"
 )
 
 var (
@@ -104,7 +106,7 @@ func (p *property) SetSource(source interface{}) error {
 			})
 
 		default:
-			return newError("invalid source type")
+			return errs.NewError("invalid source type")
 		}
 	}
 
@@ -270,7 +272,7 @@ func (bp *boolProperty) SetSource(source interface{}) error {
 			})
 
 		default:
-			return newError(fmt.Sprintf(`invalid source: "%s" of type %T`, source, source))
+			return errs.NewError(fmt.Sprintf(`invalid source: "%s" of type %T`, source, source))
 		}
 	}
 
@@ -357,7 +359,7 @@ func checkPropertySource(prop Property, source interface{}) error {
 	case Property:
 		for cur := source; cur != nil; cur, _ = cur.Source().(Property) {
 			if cur == prop {
-				return newError("source cycle")
+				return errs.NewError("source cycle")
 			}
 		}
 	}

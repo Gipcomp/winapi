@@ -19,6 +19,7 @@ import (
 	"github.com/Gipcomp/win32/kernel32"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 const inchesPerMeter float64 = 39.37007874
@@ -100,7 +101,7 @@ func newBitmap(size Size, transparent bool, dpi int) (bmp *Bitmap, err error) {
 		hBmp := gdi32.CreateDIBSection(hdc, &hdr, gdi32.DIB_RGB_COLORS, &bitsPtr, 0, 0)
 		switch hBmp {
 		case 0, kernel32.ERROR_INVALID_PARAMETER:
-			return newError("CreateDIBSection failed")
+			return errs.NewError("CreateDIBSection failed")
 		}
 
 		if transparent {
@@ -133,23 +134,23 @@ func NewBitmapFromFileForDPI(filePath string, dpi int) (*Bitmap, error) {
 	var si gdiplus.GdiplusStartupInput
 	si.GdiplusVersion = 1
 	if status := gdiplus.GdiplusStartup(&si, nil); status != gdiplus.Ok {
-		return nil, newError(fmt.Sprintf("GdiplusStartup failed with status '%s'", status))
+		return nil, errs.NewError(fmt.Sprintf("GdiplusStartup failed with status '%s'", status))
 	}
 	defer gdiplus.GdiplusShutdown()
 
 	var gpBmp *gdiplus.GpBitmap
 	fiLePathPtr, err := syscall.UTF16PtrFromString(filePath)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	if status := gdiplus.GdipCreateBitmapFromFile(fiLePathPtr, &gpBmp); status != gdiplus.Ok {
-		return nil, newError(fmt.Sprintf("GdipCreateBitmapFromFile failed with status '%s' for file '%s'", status, filePath))
+		return nil, errs.NewError(fmt.Sprintf("GdipCreateBitmapFromFile failed with status '%s' for file '%s'", status, filePath))
 	}
 	defer gdiplus.GdipDisposeImage((*gdiplus.GpImage)(gpBmp))
 
 	var hBmp gdi32.HBITMAP
 	if status := gdiplus.GdipCreateHBITMAPFromBitmap(gpBmp, &hBmp, 0); status != gdiplus.Ok {
-		return nil, newError(fmt.Sprintf("GdipCreateHBITMAPFromBitmap failed with status '%s' for file '%s'", status, filePath))
+		return nil, errs.NewError(fmt.Sprintf("GdipCreateHBITMAPFromBitmap failed with status '%s' for file '%s'", status, filePath))
 	}
 
 	return newBitmapFromHBITMAP(hBmp, dpi)
@@ -178,7 +179,7 @@ func NewBitmapFromImageForDPI(im image.Image, dpi int) (*Bitmap, error) {
 func NewBitmapFromResource(name string) (*Bitmap, error) {
 	strPtr, err := syscall.UTF16PtrFromString(name)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	return newBitmapFromResource(strPtr, 96)
 }
@@ -187,7 +188,7 @@ func NewBitmapFromResource(name string) (*Bitmap, error) {
 func NewBitmapFromResourceForDPI(name string, dpi int) (*Bitmap, error) {
 	strPtr, err := syscall.UTF16PtrFromString(name)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	return newBitmapFromResource(strPtr, dpi)
 }
@@ -207,12 +208,12 @@ func NewBitmapFromResourceIdForDPI(id int, dpi int) (*Bitmap, error) {
 func newBitmapFromResource(res *uint16, dpi int) (bm *Bitmap, err error) {
 	hInst := kernel32.GetModuleHandle(nil)
 	if hInst == 0 {
-		err = lastError("GetModuleHandle")
+		err = errs.LastError("GetModuleHandle")
 		return
 	}
 
 	if hBmp := user32.LoadImage(hInst, res, user32.IMAGE_BITMAP, 0, 0, user32.LR_CREATEDIBSECTION); hBmp == 0 {
-		err = lastError("LoadImage")
+		err = errs.LastError("LoadImage")
 	} else {
 		bm, err = newBitmapFromHBITMAP(gdi32.HBITMAP(hBmp), dpi)
 	}
@@ -282,13 +283,13 @@ func (bmp *Bitmap) ToImage() (*image.RGBA, error) {
 	bi.BmiHeader.BiSize = uint32(unsafe.Sizeof(bi.BmiHeader))
 	hdc := user32.GetDC(0)
 	if ret := gdi32.GetDIBits(hdc, bmp.hBmp, 0, 0, nil, &bi, gdi32.DIB_RGB_COLORS); ret == 0 {
-		return nil, newError("GetDIBits get bitmapinfo failed")
+		return nil, errs.NewError("GetDIBits get bitmapinfo failed")
 	}
 
 	buf := make([]byte, bi.BmiHeader.BiSizeImage)
 	bi.BmiHeader.BiCompression = gdi32.BI_RGB
 	if ret := gdi32.GetDIBits(hdc, bmp.hBmp, 0, uint32(bi.BmiHeader.BiHeight), &buf[0], &bi, gdi32.DIB_RGB_COLORS); ret == 0 {
-		return nil, newError("GetDIBits failed")
+		return nil, errs.NewError("GetDIBits failed")
 	}
 
 	width := int(bi.BmiHeader.BiWidth)
@@ -349,7 +350,7 @@ func (bmp *Bitmap) postProcess() error {
 		}
 
 		if gdi32.SetDIBits(hdc, bmp.hBmp, 0, uint32(bi.BmiHeader.BiHeight), &pixels[0].B, bi, gdi32.DIB_RGB_COLORS) == 0 {
-			return newError("SetDIBits")
+			return errs.NewError("SetDIBits")
 		}
 
 		return nil
@@ -371,12 +372,12 @@ func (bmp *Bitmap) withPixels(f func(bi *gdi32.BITMAPINFO, hdc gdi32.HDC, pixels
 
 	hdc := user32.GetDC(0)
 	if hdc == 0 {
-		return newError("GetDC")
+		return errs.NewError("GetDC")
 	}
 	defer user32.ReleaseDC(0, hdc)
 
 	if ret := gdi32.GetDIBits(hdc, bmp.hBmp, 0, 0, nil, &bi, gdi32.DIB_RGB_COLORS); ret == 0 {
-		return newError("GetDIBits #1")
+		return errs.NewError("GetDIBits #1")
 	}
 
 	hPixels := kernel32.GlobalAlloc(kernel32.GMEM_FIXED, uintptr(bi.BmiHeader.BiSizeImage))
@@ -386,7 +387,7 @@ func (bmp *Bitmap) withPixels(f func(bi *gdi32.BITMAPINFO, hdc gdi32.HDC, pixels
 
 	bi.BmiHeader.BiCompression = gdi32.BI_RGB
 	if ret := gdi32.GetDIBits(hdc, bmp.hBmp, 0, uint32(bi.BmiHeader.BiHeight), &pixels[0].B, &bi, gdi32.DIB_RGB_COLORS); ret == 0 {
-		return newError("GetDIBits #2")
+		return errs.NewError("GetDIBits #2")
 	}
 
 	gdi32.GdiFlush()
@@ -440,7 +441,7 @@ func (bmp *Bitmap) alphaBlendPart(hdc gdi32.HDC, dst, src Rectangle, opacity byt
 
 			if !transparent {
 				if gdi32.SetStretchBltMode(hdc, gdi32.HALFTONE) == 0 {
-					return newError("SetStretchBltMode")
+					return errs.NewError("SetStretchBltMode")
 				}
 
 				if !gdi32.StretchBlt(
@@ -456,7 +457,7 @@ func (bmp *Bitmap) alphaBlendPart(hdc gdi32.HDC, dst, src Rectangle, opacity byt
 					int32(src.Height),
 					gdi32.SRCCOPY,
 				) {
-					return newError("StretchBlt failed")
+					return errs.NewError("StretchBlt failed")
 				}
 
 				return nil
@@ -476,7 +477,7 @@ func (bmp *Bitmap) alphaBlendPart(hdc gdi32.HDC, dst, src Rectangle, opacity byt
 			int32(src.Height),
 			gdi32.BLENDFUNCTION{AlphaFormat: gdi32.AC_SRC_ALPHA, SourceConstantAlpha: opacity},
 		) {
-			return newError("AlphaBlend failed")
+			return errs.NewError("AlphaBlend failed")
 		}
 
 		return nil
@@ -487,7 +488,7 @@ func (bmp *Bitmap) withSelectedIntoMemDC(f func(hdcMem gdi32.HDC) error) error {
 	return withCompatibleDC(func(hdcMem gdi32.HDC) error {
 		hBmpOld := gdi32.SelectObject(hdcMem, gdi32.HGDIOBJ(bmp.hBmp))
 		if hBmpOld == 0 {
-			return newError("SelectObject failed")
+			return errs.NewError("SelectObject failed")
 		}
 		defer gdi32.SelectObject(hdcMem, hBmpOld)
 
@@ -502,7 +503,7 @@ func (bmp *Bitmap) withSelectedIntoMemDC(f func(hdcMem gdi32.HDC) error) error {
 func newBitmapFromHBITMAP(hBmp gdi32.HBITMAP, dpi int) (bmp *Bitmap, err error) {
 	var dib gdi32.DIBSECTION
 	if gdi32.GetObject(gdi32.HGDIOBJ(hBmp), unsafe.Sizeof(dib), unsafe.Pointer(&dib)) == 0 {
-		return nil, newError("GetObject failed")
+		return nil, errs.NewError("GetObject failed")
 	}
 
 	bmih := &dib.DsBmih
@@ -563,7 +564,7 @@ func hBitmapFromImage(im image.Image, dpi int) (gdi32.HBITMAP, error) {
 	hBitmap := gdi32.CreateDIBSection(hdc, &bi.BITMAPINFOHEADER, gdi32.DIB_RGB_COLORS, &lpBits, 0, 0)
 	switch hBitmap {
 	case 0, kernel32.ERROR_INVALID_PARAMETER:
-		return 0, newError("CreateDIBSection failed")
+		return 0, errs.NewError("CreateDIBSection failed")
 	}
 
 	// Fill the image
@@ -586,13 +587,13 @@ func hBitmapFromImage(im image.Image, dpi int) (gdi32.HBITMAP, error) {
 func hBitmapFromWindow(window Window) (gdi32.HBITMAP, error) {
 	hdcMem := gdi32.CreateCompatibleDC(0)
 	if hdcMem == 0 {
-		return 0, newError("CreateCompatibleDC failed")
+		return 0, errs.NewError("CreateCompatibleDC failed")
 	}
 	defer gdi32.DeleteDC(hdcMem)
 
 	var r gdi32.RECT
 	if !user32.GetWindowRect(window.Handle(), &r) {
-		return 0, newError("GetWindowRect failed")
+		return 0, errs.NewError("GetWindowRect failed")
 	}
 
 	hdc := user32.GetDC(window.Handle())
@@ -617,7 +618,7 @@ func hBitmapFromIcon(icon *Icon, size Size, dpi int) (gdi32.HBITMAP, error) {
 
 	hdcMem := gdi32.CreateCompatibleDC(hdc)
 	if hdcMem == 0 {
-		return 0, newError("CreateCompatibleDC failed")
+		return 0, errs.NewError("CreateCompatibleDC failed")
 	}
 	defer gdi32.DeleteDC(hdcMem)
 
@@ -641,7 +642,7 @@ func hBitmapFromIcon(icon *Icon, size Size, dpi int) (gdi32.HBITMAP, error) {
 	hBmp := gdi32.CreateDIBSection(hdcMem, &bi.BITMAPINFOHEADER, gdi32.DIB_RGB_COLORS, nil, 0, 0)
 	switch hBmp {
 	case 0, kernel32.ERROR_INVALID_PARAMETER:
-		return 0, newError("CreateDIBSection failed")
+		return 0, errs.NewError("CreateDIBSection failed")
 	}
 
 	hOld := gdi32.SelectObject(hdcMem, gdi32.HGDIOBJ(hBmp))
@@ -658,7 +659,7 @@ func hBitmapFromIcon(icon *Icon, size Size, dpi int) (gdi32.HBITMAP, error) {
 func withCompatibleDC(f func(hdc gdi32.HDC) error) error {
 	hdc := gdi32.CreateCompatibleDC(0)
 	if hdc == 0 {
-		return newError("CreateCompatibleDC failed")
+		return errs.NewError("CreateCompatibleDC failed")
 	}
 	defer gdi32.DeleteDC(hdc)
 

@@ -20,7 +20,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
-	"github.com/Gipcomp/winapi/helpers"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type ComboBox struct {
@@ -217,7 +217,7 @@ func newComboBoxWithStyle(parent Container, style uint32) (*ComboBox, error) {
 				if cb.model == nil {
 					return nil
 				} else {
-					return newError("Data binding is only supported using a model that implements BindingValueProvider.")
+					return errs.NewError("Data binding is only supported using a model that implements BindingValueProvider.")
 				}
 			}
 
@@ -277,7 +277,7 @@ func (cb *ComboBox) insertItemAt(index int) error {
 	lp := uintptr(unsafe.Pointer(strPtr))
 
 	if commctrl.CB_ERR == cb.SendMessage(commctrl.CB_INSERTSTRING, uintptr(index), lp) {
-		return newError("SendMessage(CB_INSERTSTRING)")
+		return errs.NewError("SendMessage(CB_INSERTSTRING)")
 	}
 
 	return nil
@@ -285,7 +285,7 @@ func (cb *ComboBox) insertItemAt(index int) error {
 
 func (cb *ComboBox) removeItem(index int) error {
 	if commctrl.CB_ERR == cb.SendMessage(commctrl.CB_DELETESTRING, uintptr(index), 0) {
-		return newError("SendMessage(CB_DELETESTRING")
+		return errs.NewError("SendMessage(CB_DELETESTRING")
 	}
 
 	return nil
@@ -298,7 +298,7 @@ func (cb *ComboBox) resetItems() error {
 	cb.selChangeIndex = -1
 
 	if win.FALSE == cb.SendMessage(commctrl.CB_RESETCONTENT, 0, 0) {
-		return newError("SendMessage(CB_RESETCONTENT)")
+		return errs.NewError("SendMessage(CB_RESETCONTENT)")
 	}
 
 	cb.maxItemTextWidth = 0
@@ -337,7 +337,7 @@ func (cb *ComboBox) attachModel() {
 
 	itemChangedHandler := func(index int) {
 		if commctrl.CB_ERR == cb.SendMessage(commctrl.CB_DELETESTRING, uintptr(index), 0) {
-			newError("SendMessage(CB_DELETESTRING)")
+			errs.NewError("SendMessage(CB_DELETESTRING)")
 		}
 
 		cb.insertItemAt(index)
@@ -448,7 +448,7 @@ func (cb *ComboBox) BindingMember() string {
 func (cb *ComboBox) SetBindingMember(bindingMember string) error {
 	if bindingMember != "" {
 		if _, ok := cb.providedModel.([]string); ok {
-			return newError("invalid for []string model")
+			return errs.NewError("invalid for []string model")
 		}
 	}
 
@@ -489,7 +489,7 @@ func (cb *ComboBox) DisplayMember() string {
 func (cb *ComboBox) SetDisplayMember(displayMember string) error {
 	if displayMember != "" {
 		if _, ok := cb.providedModel.([]string); ok {
-			return newError("invalid for []string model")
+			return errs.NewError("invalid for []string model")
 		}
 	}
 
@@ -532,7 +532,7 @@ func (cb *ComboBox) SetMaxLength(value int) {
 func (cb *ComboBox) calculateMaxItemTextWidth() int {
 	hdc := user32.GetDC(cb.hWnd)
 	if hdc == 0 {
-		newError("GetDC failed")
+		errs.NewError("GetDC failed")
 		return -1
 	}
 	defer user32.ReleaseDC(cb.hWnd, hdc)
@@ -546,11 +546,14 @@ func (cb *ComboBox) calculateMaxItemTextWidth() int {
 	for i := 0; i < count; i++ {
 		var s gdi32.SIZE
 		str, _ := syscall.UTF16PtrFromString(cb.itemString(i))
+
 		//str := syscall.StringToUTF16(cb.itemString(i))
 
 		// if !gdi32.GetTextExtentPoint32(hdc, &str[0], int32(len(str)-1), &s) {
-		if !gdi32.GetTextExtentPoint32(hdc, str, int32(len(helpers.UINT16PtrToString(str))), &s) {
-			newError("GetTextExtentPoint32 failed")
+
+		// if !gdi32.GetTextExtentPoint32(hdc, str, int32(len(helpers.UINT16PtrToString(str))), &s) {
+		if !gdi32.GetTextExtentPoint32(hdc, str, int32(len(cb.itemString(i))), &s) {
+			errs.NewError("GetTextExtentPoint32 failed")
 			return -1
 		}
 
@@ -568,7 +571,7 @@ func (cb *ComboBox) SetCurrentIndex(value int) error {
 	index := int(int32(cb.SendMessage(commctrl.CB_SETCURSEL, uintptr(value), 0)))
 
 	if index != value {
-		return newError("invalid index")
+		return errs.NewError("invalid index")
 	}
 
 	if value != cb.prevCurIndex {

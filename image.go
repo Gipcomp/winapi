@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/Gipcomp/win32/gdi32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type Image interface {
@@ -125,7 +126,7 @@ func (pfi *PaintFuncImage) drawStretchedOnCanvasPixels(canvas *Canvas, bounds Re
 		return pfi.paint(canvas, RectangleTo96DPI(bounds, canvas.DPI()))
 	}
 
-	return newError("paint(Pixels) func is nil")
+	return errs.NewError("paint(Pixels) func is nil")
 }
 
 func (pfi *PaintFuncImage) Dispose() {

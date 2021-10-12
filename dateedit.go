@@ -16,6 +16,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/kernel32"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type DateEdit struct {
@@ -117,7 +118,7 @@ func (de *DateEdit) systemTime() (*kernel32.SYSTEMTIME, error) {
 		return nil, nil
 	}
 
-	return nil, newError("SendMessage(DTM_GETSYSTEMTIME)")
+	return nil, errs.NewError("SendMessage(DTM_GETSYSTEMTIME)")
 }
 
 func (de *DateEdit) setSystemTime(st *kernel32.SYSTEMTIME) error {
@@ -133,7 +134,7 @@ func (de *DateEdit) setSystemTime(st *kernel32.SYSTEMTIME) error {
 	}
 
 	if de.SendMessage(commctrl.DTM_SETSYSTEMTIME, wParam, uintptr(unsafe.Pointer(st))) == 0 {
-		return newError("SendMessage(DTM_SETSYSTEMTIME)")
+		return errs.NewError("SendMessage(DTM_SETSYSTEMTIME)")
 	}
 
 	return nil
@@ -150,12 +151,12 @@ func (de *DateEdit) Format() string {
 func (de *DateEdit) SetFormat(format string) error {
 	strPtr, err := syscall.UTF16PtrFromString(format)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	lp := uintptr(unsafe.Pointer(strPtr))
 
 	if de.SendMessage(commctrl.DTM_SETFORMAT, 0, lp) == 0 {
-		return newError("DTM_SETFORMAT failed")
+		return errs.NewError("DTM_SETFORMAT failed")
 	}
 
 	de.format = format
@@ -184,7 +185,7 @@ func (de *DateEdit) SetRange(min, max time.Time) error {
 		if min.Year() > max.Year() ||
 			min.Year() == max.Year() && min.Month() > max.Month() ||
 			min.Year() == max.Year() && min.Month() == max.Month() && min.Day() > max.Day() {
-			return newError("invalid range")
+			return errs.NewError("invalid range")
 		}
 	}
 
@@ -202,7 +203,7 @@ func (de *DateEdit) SetRange(min, max time.Time) error {
 	}
 
 	if de.SendMessage(commctrl.DTM_SETRANGE, wParam, uintptr(unsafe.Pointer(&st[0]))) == 0 {
-		return newError("SendMessage(DTM_SETRANGE)")
+		return errs.NewError("SendMessage(DTM_SETRANGE)")
 	}
 
 	return nil

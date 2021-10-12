@@ -25,6 +25,7 @@ import (
 	"github.com/Gipcomp/win32/uxtheme"
 	"github.com/Gipcomp/win32/win"
 	"github.com/Gipcomp/win32/winuser"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 // App-specific message ids for internal use in Walk.
@@ -464,7 +465,7 @@ func init() {
 		forEachDescendantRawCallbackPtr = syscall.NewCallback(forEachDescendantRaw)
 		dialogBaseUnitsUTF16StringPtr, err = syscall.UTF16PtrFromString("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
 		if err != nil {
-			newError(err.Error())
+			errs.NewError(err.Error())
 		}
 	})
 }
@@ -519,7 +520,7 @@ func MustRegisterWindowClassWithWndProcPtrAndStyle(className string, wndProcPtr 
 	wc.HbrBackground = user32.COLOR_BTNFACE + 1
 	wc.LpszClassName, err = syscall.UTF16PtrFromString(className)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	wc.Style = style
 
@@ -638,7 +639,7 @@ func initWindowWithCfg(cfg *windowCfg) error {
 			0,
 			nil)
 		if wb.hWnd == 0 {
-			return lastError("CreateWindowEx")
+			return errs.LastError("CreateWindowEx")
 		}
 	} else {
 		wb.hWnd = hwnd
@@ -674,7 +675,7 @@ func initWindowWithCfg(cfg *windowCfg) error {
 		// We subclass all windows of system classes.
 		wb.origWndProcPtr = user32.SetWindowLongPtr(wb.hWnd, user32.GWLP_WNDPROC, defaultWndProcPtr)
 		if wb.origWndProcPtr == 0 {
-			return lastError("SetWindowLongPtr")
+			return errs.LastError("SetWindowLongPtr")
 		}
 	}
 
@@ -796,13 +797,13 @@ func (wb *WindowBase) setAndClearExtendedStyleBits(set, clear uint32) error {
 func setAndClearWindowLongBits(hwnd handle.HWND, index int32, set, clear uint32) error {
 	value := uint32(user32.GetWindowLong(hwnd, index))
 	if value == 0 {
-		return lastError("GetWindowLong")
+		return errs.LastError("GetWindowLong")
 	}
 
 	if newValue := value&^clear | set; newValue != value {
 		kernel32.SetLastError(0)
 		if user32.SetWindowLong(hwnd, index, int32(newValue)) == 0 {
-			return lastError("SetWindowLong")
+			return errs.LastError("SetWindowLong")
 		}
 	}
 
@@ -1232,7 +1233,7 @@ func (wb *WindowBase) SetSuspended(suspend bool) {
 // Invalidate schedules a full repaint of the *WindowBase.
 func (wb *WindowBase) Invalidate() error {
 	if !user32.InvalidateRect(wb.hWnd, nil, true) {
-		return newError("InvalidateRect failed")
+		return errs.NewError("InvalidateRect failed")
 	}
 
 	return nil
@@ -1263,7 +1264,7 @@ func setWindowText(hwnd handle.HWND, text string) error {
 		return err
 	}
 	if win.TRUE != user32.SendMessage(hwnd, user32.WM_SETTEXT, 0, uintptr(unsafe.Pointer(strPtr))) {
-		return newError("WM_SETTEXT failed")
+		return errs.NewError("WM_SETTEXT failed")
 	}
 
 	return nil
@@ -1413,7 +1414,7 @@ func setWindowVisible(hwnd handle.HWND, visible bool) {
 // BringToTop moves the *WindowBase to the top of the keyboard focus order.
 func (wb *WindowBase) BringToTop() error {
 	if !user32.SetWindowPos(wb.hWnd, user32.HWND_TOP, 0, 0, 0, 0, user32.SWP_NOACTIVATE|user32.SWP_NOMOVE|user32.SWP_NOSIZE) {
-		return lastError("SetWindowPos")
+		return errs.LastError("SetWindowPos")
 	}
 
 	return nil
@@ -1444,7 +1445,7 @@ func (wb *WindowBase) BoundsPixels() Rectangle {
 	var r gdi32.RECT
 
 	if !user32.GetWindowRect(wb.hWnd, &r) {
-		lastError("GetWindowRect")
+		errs.LastError("GetWindowRect")
 		return Rectangle{}
 	}
 
@@ -1465,7 +1466,7 @@ func (wb *WindowBase) SetBoundsPixels(bounds Rectangle) error {
 		int32(bounds.Height),
 		true) {
 
-		return lastError("MoveWindow")
+		return errs.LastError("MoveWindow")
 	}
 
 	return nil
@@ -1513,11 +1514,11 @@ func (wb *WindowBase) MaxSizePixels() Size {
 // Use walk.Size{} to make the respective limit be ignored.
 func (wb *WindowBase) SetMinMaxSize(min, max Size) error {
 	if min.Width < 0 || min.Height < 0 {
-		return newError("min must be positive")
+		return errs.NewError("min must be positive")
 	}
 	if max.Width > 0 && max.Width < min.Width ||
 		max.Height > 0 && max.Height < min.Height {
-		return newError("max must be greater as or equal to min")
+		return errs.NewError("max must be greater as or equal to min")
 	}
 	wb.minSize96dpi = min
 	wb.maxSize96dpi = max
@@ -1568,7 +1569,7 @@ func (wb *WindowBase) dialogBaseUnits() Size {
 
 	var tm gdi32.TEXTMETRIC
 	if !gdi32.GetTextMetrics(hdc, &tm) {
-		newError("GetTextMetrics failed")
+		errs.NewError("GetTextMetrics failed")
 	}
 
 	var size gdi32.SIZE
@@ -1577,7 +1578,7 @@ func (wb *WindowBase) dialogBaseUnits() Size {
 		dialogBaseUnitsUTF16StringPtr,
 		52,
 		&size) {
-		newError("GetTextExtentPoint32 failed")
+		errs.NewError("GetTextExtentPoint32 failed")
 	}
 
 	s := Size{int((size.CX/26 + 1) / 2), int(tm.TmHeight)}
@@ -1649,7 +1650,7 @@ func (wb *WindowBase) calculateTextSizeForWidth(width int) Size {
 func calculateTextSize(text string, font *Font, dpi int, width int, hwnd handle.HWND) Size {
 	hdc := user32.GetDC(hwnd)
 	if hdc == 0 {
-		newError("GetDC failed")
+		errs.NewError("GetDC failed")
 		return Size{}
 	}
 	defer user32.ReleaseDC(hwnd, hdc)
@@ -1678,11 +1679,11 @@ func calculateTextSize(text string, font *Font, dpi int, width int, hwnd handle.
 			var s gdi32.SIZE
 			str, err := syscall.UTF16FromString(strings.TrimRight(line, "\r "))
 			if err == nil {
-				newError(err.Error())
+				errs.NewError(err.Error())
 			}
 
 			if !gdi32.GetTextExtentPoint32(hdc, &str[0], int32(len(str)-1), &s) {
-				newError("GetTextExtentPoint32 failed")
+				errs.NewError("GetTextExtentPoint32 failed")
 				return Size{}
 			}
 
@@ -1828,7 +1829,7 @@ func windowTrimToClientBounds(hwnd handle.HWND, pt *gdi32.POINT) {
 	var r gdi32.RECT
 
 	if !user32.GetClientRect(hwnd, &r) {
-		lastError("GetClientRect")
+		errs.LastError("GetClientRect")
 		return
 	}
 
@@ -1851,7 +1852,7 @@ func windowClientBounds(hwnd handle.HWND) Rectangle {
 	var r gdi32.RECT
 
 	if !user32.GetClientRect(hwnd, &r) {
-		lastError("GetClientRect")
+		errs.LastError("GetClientRect")
 		return Rectangle{}
 	}
 
@@ -1987,7 +1988,7 @@ func (wb *WindowBase) Focused() bool {
 // SetFocus sets the keyboard input focus to the *WindowBase.
 func (wb *WindowBase) SetFocus() error {
 	if user32.SetFocus(wb.hWnd) == 0 {
-		return lastError("SetFocus")
+		return errs.LastError("SetFocus")
 	}
 
 	return nil
@@ -2014,7 +2015,7 @@ func (wb *WindowBase) setTheme(appName string) error {
 		return err
 	}
 	if hr := uxtheme.SetWindowTheme(wb.hWnd, strPtr, nil); win.FAILED(hr) {
-		return errorFromHRESULT("SetWindowTheme", hr)
+		return errs.ErrorFromHRESULT("SetWindowTheme", hr)
 	}
 
 	return nil
@@ -2130,7 +2131,7 @@ func (wb *WindowBase) synchronizeLayout(result *formLayoutResult) {
 func (wb *WindowBase) ReadState() (string, error) {
 	settings := App().Settings()
 	if settings == nil {
-		return "", newError("App().Settings() must not be nil")
+		return "", errs.NewError("App().Settings() must not be nil")
 	}
 
 	state, _ := settings.Get(wb.path())
@@ -2140,7 +2141,7 @@ func (wb *WindowBase) ReadState() (string, error) {
 func (wb *WindowBase) WriteState(state string) error {
 	settings := App().Settings()
 	if settings == nil {
-		return newError("App().Settings() must not be nil")
+		return errs.NewError("App().Settings() must not be nil")
 	}
 
 	p := wb.path()
@@ -2170,9 +2171,9 @@ func defaultWndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) (resul
 			var err error
 			if x := recover(); x != nil {
 				if e, ok := x.(error); ok {
-					err = wrapErrorNoPanic(e)
+					err = errs.WrapErrorNoPanic(e)
 				} else {
-					err = newErrorNoPanic(fmt.Sprint(x))
+					err = errs.NewErrorNoPanic(fmt.Sprint(x))
 				}
 			}
 			if err != nil {
@@ -2407,7 +2408,7 @@ func (wb *WindowBase) WndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintp
 		if msg == user32.WM_LBUTTONUP && wb.origWndProcPtr == 0 {
 			// See WM_LBUTTONDOWN for why we require origWndProcPtr == 0 here.
 			if !user32.ReleaseCapture() {
-				lastError("ReleaseCapture")
+				errs.LastError("ReleaseCapture")
 			}
 		}
 		wb.publishMouseEvent(&wb.mouseUpPublisher, msg, wParam, lParam)

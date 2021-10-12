@@ -14,6 +14,7 @@ import (
 	"github.com/Gipcomp/win32/handle"
 	"github.com/Gipcomp/win32/shell32"
 	"github.com/Gipcomp/win32/user32"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 var notifyIcons = make(map[*NotifyIcon]bool)
@@ -47,7 +48,7 @@ func notifyIconWndProc(hwnd handle.HWND, msg uint32, wParam, lParam uintptr) (re
 
 		var p gdi32.POINT
 		if !user32.GetCursorPos(&p) {
-			lastError("GetCursorPos")
+			errs.LastError("GetCursorPos")
 		}
 
 		ni.applyDPI()
@@ -103,14 +104,14 @@ func NewNotifyIcon(form Form) (*NotifyIcon, error) {
 	nid.CbSize = uint32(unsafe.Sizeof(nid) - unsafe.Sizeof(user32.HICON(0)))
 
 	if !shell32.Shell_NotifyIcon(shell32.NIM_ADD, &nid) {
-		return nil, newError("Shell_NotifyIcon")
+		return nil, errs.NewError("Shell_NotifyIcon")
 	}
 
 	// We want XP-compatible message behavior.
 	nid.UVersion = shell32.NOTIFYICON_VERSION
 
 	if !shell32.Shell_NotifyIcon(shell32.NIM_SETVERSION, &nid) {
-		return nil, newError("Shell_NotifyIcon")
+		return nil, errs.NewError("Shell_NotifyIcon")
 	}
 
 	// Create and initialize the NotifyIcon already.
@@ -138,11 +139,11 @@ func NewNotifyIcon(form Form) (*NotifyIcon, error) {
 func (ni *NotifyIcon) DPI() int {
 	shellTrayWndPtr, err := syscall.UTF16PtrFromString("Shell_TrayWnd")
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	emptyPtr, err := syscall.UTF16PtrFromString("")
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	fakeWb := WindowBase{hWnd: user32.FindWindow(shellTrayWndPtr, emptyPtr)}
 	return fakeWb.DPI()
@@ -159,14 +160,14 @@ func (ni *NotifyIcon) readdToTaskbar() error {
 	nid.CbSize = uint32(unsafe.Sizeof(nid) - unsafe.Sizeof(user32.HICON(0)))
 
 	if !shell32.Shell_NotifyIcon(shell32.NIM_ADD, &nid) {
-		return newError("Shell_NotifyIcon")
+		return errs.NewError("Shell_NotifyIcon")
 	}
 
 	// We want XP-compatible message behavior.
 	nid.UVersion = shell32.NOTIFYICON_VERSION
 
 	if !shell32.Shell_NotifyIcon(shell32.NIM_SETVERSION, &nid) {
-		return newError("Shell_NotifyIcon")
+		return errs.NewError("Shell_NotifyIcon")
 	}
 
 	icon := ni.icon
@@ -231,7 +232,7 @@ func (ni *NotifyIcon) Dispose() error {
 	nid := ni.notifyIconData()
 
 	if !shell32.Shell_NotifyIcon(shell32.NIM_DELETE, nid) {
-		return newError("Shell_NotifyIcon")
+		return errs.NewError("Shell_NotifyIcon")
 	}
 
 	ni.hWnd = 0
@@ -258,7 +259,7 @@ func (ni *NotifyIcon) showMessage(title, info string, iconType uint32, icon Imag
 		copy(nid.SzInfo[:], info16)
 	}
 	if !shell32.Shell_NotifyIcon(shell32.NIM_MODIFY, nid) {
-		return newError("Shell_NotifyIcon")
+		return errs.NewError("Shell_NotifyIcon")
 	}
 	if oldIcon != nil {
 		ni.icon = nil
@@ -331,7 +332,7 @@ func (ni *NotifyIcon) SetIcon(icon Image) error {
 	}
 
 	if !shell32.Shell_NotifyIcon(shell32.NIM_MODIFY, nid) {
-		return newError("Shell_NotifyIcon")
+		return errs.NewError("Shell_NotifyIcon")
 	}
 
 	ni.icon = icon
@@ -365,12 +366,12 @@ func (ni *NotifyIcon) SetToolTip(toolTip string) error {
 	nid.UFlags = shell32.NIF_TIP
 	cp, err := syscall.UTF16FromString(toolTip)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	copy(nid.SzTip[:], cp)
 
 	if !shell32.Shell_NotifyIcon(shell32.NIM_MODIFY, nid) {
-		return newError("Shell_NotifyIcon")
+		return errs.NewError("Shell_NotifyIcon")
 	}
 
 	ni.toolTip = toolTip
@@ -397,7 +398,7 @@ func (ni *NotifyIcon) SetVisible(visible bool) error {
 	}
 
 	if !shell32.Shell_NotifyIcon(shell32.NIM_MODIFY, nid) {
-		return newError("Shell_NotifyIcon")
+		return errs.NewError("Shell_NotifyIcon")
 	}
 
 	ni.visible = visible
@@ -408,7 +409,7 @@ func (ni *NotifyIcon) SetVisible(visible bool) error {
 func (ni *NotifyIcon) publishMouseEvent(publisher *MouseEventPublisher, button MouseButton) {
 	var p gdi32.POINT
 	if !user32.GetCursorPos(&p) {
-		lastError("GetCursorPos")
+		errs.LastError("GetCursorPos")
 	}
 
 	publisher.Publish(int(p.X), int(p.Y), button)

@@ -19,6 +19,7 @@ import (
 	"github.com/Gipcomp/win32/shell32"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type FileDialog struct {
@@ -43,7 +44,7 @@ func (dlg *FileDialog) show(owner Form, fun func(ofn *comdlg32.OPENFILENAME) boo
 	filter := make([]uint16, len(dlg.Filter)+2)
 	strUtf, err := syscall.UTF16FromString(dlg.Filter)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	copy(filter, strUtf)
 	// Replace '|' with the expected '\0'.
@@ -57,11 +58,11 @@ func (dlg *FileDialog) show(owner Form, fun func(ofn *comdlg32.OPENFILENAME) boo
 
 	ofn.LpstrInitialDir, err = syscall.UTF16PtrFromString(dlg.InitialDirPath)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	ofn.LpstrTitle, err = syscall.UTF16PtrFromString(dlg.Title)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	ofn.Flags = comdlg32.OFN_FILEMUSTEXIST | flags | dlg.Flags
 
@@ -76,7 +77,7 @@ func (dlg *FileDialog) show(owner Form, fun func(ofn *comdlg32.OPENFILENAME) boo
 		fileBuf = make([]uint16, 1024)
 		strUtf, err := syscall.UTF16FromString(dlg.FilePath)
 		if err != nil {
-			newError(err.Error())
+			errs.NewError(err.Error())
 		}
 		copy(fileBuf, strUtf)
 	}
@@ -86,7 +87,7 @@ func (dlg *FileDialog) show(owner Form, fun func(ofn *comdlg32.OPENFILENAME) boo
 	if !fun(ofn) {
 		errno := comdlg32.CommDlgExtendedError()
 		if errno != 0 {
-			err = newError(fmt.Sprintf("Error %d", errno))
+			err = errs.NewError(fmt.Sprintf("Error %d", errno))
 		}
 		return
 	}
@@ -148,7 +149,7 @@ func (dlg *FileDialog) ShowSave(owner Form) (accepted bool, err error) {
 func pathFromPIDL(pidl uintptr) (string, error) {
 	var path [kernel32.MAX_PATH]uint16
 	if !shell32.SHGetPathFromIDList(pidl, &path[0]) {
-		return "", newError("SHGetPathFromIDList failed")
+		return "", errs.NewError("SHGetPathFromIDList failed")
 	}
 
 	return syscall.UTF16ToString(path[:]), nil
@@ -183,7 +184,7 @@ func init() {
 func (dlg *FileDialog) ShowBrowseFolder(owner Form) (accepted bool, err error) {
 	// Calling OleInitialize (or similar) is required for BIF_NEWDIALOGSTYLE.
 	if hr := ole32.OleInitialize(); hr != win.S_OK && hr != win.S_FALSE {
-		return false, newError(fmt.Sprint("OleInitialize Error: ", hr))
+		return false, errs.NewError(fmt.Sprint("OleInitialize Error: ", hr))
 	}
 	defer ole32.OleUninitialize()
 
@@ -197,14 +198,14 @@ func (dlg *FileDialog) ShowBrowseFolder(owner Form) (accepted bool, err error) {
 	var buf [kernel32.MAX_PATH]uint16
 	strUtf, err := syscall.UTF16FromString(dlg.InitialDirPath)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	copy(buf[:], strUtf)
 
 	const BIF_NEWDIALOGSTYLE = 0x00000040
 	strPtr, err := syscall.UTF16PtrFromString(dlg.Title)
 	if err != nil {
-		newError(err.Error())
+		errs.NewError(err.Error())
 	}
 	bi := shell32.BROWSEINFO{
 		HwndOwner: ownerHwnd,

@@ -12,6 +12,8 @@ import (
 	"reflect"
 	"strings"
 	"time"
+
+	"github.com/Gipcomp/winapi/errs"
 )
 
 var (
@@ -107,7 +109,7 @@ func (db *DataBinder) SetDataSource(dataSource interface{}) error {
 
 	if dataSource != nil {
 		if t := reflect.TypeOf(dataSource); t.Kind() != reflect.Map && (t.Kind() != reflect.Ptr || t.Elem().Kind() != reflect.Struct) {
-			return newError("dataSource must be pointer to struct or map[string]interface{}")
+			return errs.NewError("dataSource must be pointer to struct or map[string]interface{}")
 		}
 	}
 
@@ -305,7 +307,7 @@ func (db *DataBinder) Reset() error {
 				f64 = float64(v)
 
 			default:
-				return newError(fmt.Sprintf("Field '%s': Can't convert %T to float64.", prop.Source().(string), field.Get()))
+				return errs.NewError(fmt.Sprintf("Field '%s': Can't convert %T to float64.", prop.Source().(string), field.Get()))
 			}
 
 			if err := prop.Set(f64); err != nil {
@@ -595,7 +597,7 @@ func (f *reflectField) Set(value interface{}) error {
 			f.value.SetUint(uint64(f64))
 
 		default:
-			return newError(fmt.Sprintf("Can't convert float64 to %s.", f.value.Type().Name()))
+			return errs.NewError(fmt.Sprintf("Can't convert float64 to %s.", f.value.Type().Name()))
 		}
 
 		return nil

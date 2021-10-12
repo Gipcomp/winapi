@@ -9,6 +9,8 @@ package winapi
 import (
 	"sort"
 	"sync"
+
+	"github.com/Gipcomp/winapi/errs"
 )
 
 type gridLayoutCell struct {
@@ -116,15 +118,15 @@ func (l *GridLayout) RowStretchFactor(row int) int {
 
 func (l *GridLayout) SetRowStretchFactor(row, factor int) error {
 	if row < 0 {
-		return newError("row must be >= 0")
+		return errs.NewError("row must be >= 0")
 	}
 
 	if factor != l.RowStretchFactor(row) {
 		if l.container == nil {
-			return newError("container required")
+			return errs.NewError("container required")
 		}
 		if factor < 1 {
-			return newError("factor must be >= 1")
+			return errs.NewError("factor must be >= 1")
 		}
 
 		l.ensureSufficientSize(row+1, len(l.columnStretchFactors))
@@ -152,15 +154,15 @@ func (l *GridLayout) ColumnStretchFactor(column int) int {
 
 func (l *GridLayout) SetColumnStretchFactor(column, factor int) error {
 	if column < 0 {
-		return newError("column must be >= 0")
+		return errs.NewError("column must be >= 0")
 	}
 
 	if factor != l.ColumnStretchFactor(column) {
 		if l.container == nil {
-			return newError("container required")
+			return errs.NewError("container required")
 		}
 		if factor < 1 {
-			return newError("factor must be >= 1")
+			return errs.NewError("factor must be >= 1")
 		}
 
 		l.ensureSufficientSize(len(l.rowStretchFactors), column+1)
@@ -213,19 +215,19 @@ func (l *GridLayout) Range(widget Widget) (r Rectangle, ok bool) {
 
 func (l *GridLayout) SetRange(widget Widget, r Rectangle) error {
 	if widget == nil {
-		return newError("widget required")
+		return errs.NewError("widget required")
 	}
 	if l.container == nil {
-		return newError("container required")
+		return errs.NewError("container required")
 	}
 	if !l.container.Children().containsHandle(widget.Handle()) {
-		return newError("widget must be child of container")
+		return errs.NewError("widget must be child of container")
 	}
 	if r.X < 0 || r.Y < 0 {
-		return newError("range.X and range.Y must be >= 0")
+		return errs.NewError("range.X and range.Y must be >= 0")
 	}
 	if r.Width < 1 || r.Height < 1 {
-		return newError("range.Width and range.Height must be >= 1")
+		return errs.NewError("range.Width and range.Height must be >= 1")
 	}
 
 	wb := widget.AsWidgetBase()

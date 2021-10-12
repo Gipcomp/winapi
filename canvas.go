@@ -16,6 +16,7 @@ import (
 	"github.com/Gipcomp/win32/kernel32"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/win32/win"
+	"github.com/Gipcomp/winapi/errs"
 )
 
 // DrawText format flags
@@ -72,7 +73,7 @@ func NewCanvasFromImage(image Image) (*Canvas, error) {
 	case *Bitmap:
 		hdc := gdi32.CreateCompatibleDC(0)
 		if hdc == 0 {
-			return nil, newError("CreateCompatibleDC failed")
+			return nil, errs.NewError("CreateCompatibleDC failed")
 		}
 		succeeded := false
 
@@ -84,7 +85,7 @@ func NewCanvasFromImage(image Image) (*Canvas, error) {
 
 		var hBmpStock gdi32.HBITMAP
 		if hBmpStock = gdi32.HBITMAP(gdi32.SelectObject(hdc, gdi32.HGDIOBJ(img.hBmp))); hBmpStock == 0 {
-			return nil, newError("SelectObject failed")
+			return nil, errs.NewError("SelectObject failed")
 		}
 
 		succeeded = true
@@ -102,13 +103,13 @@ func NewCanvasFromImage(image Image) (*Canvas, error) {
 		return c, nil
 	}
 
-	return nil, newError("unsupported image type")
+	return nil, errs.NewError("unsupported image type")
 }
 
 func newCanvasFromWindow(window Window) (*Canvas, error) {
 	hdc := user32.GetDC(window.Handle())
 	if hdc == 0 {
-		return nil, newError("GetDC failed")
+		return nil, errs.NewError("GetDC failed")
 	}
 
 	return (&Canvas{hdc: hdc, window: window}).init()
@@ -116,7 +117,7 @@ func newCanvasFromWindow(window Window) (*Canvas, error) {
 
 func newCanvasFromHDC(hdc gdi32.HDC) (*Canvas, error) {
 	if hdc == 0 {
-		return nil, newError("invalid hdc")
+		return nil, errs.NewError("invalid hdc")
 	}
 
 	return (&Canvas{hdc: hdc, doNotDispose: true}).init()
@@ -128,16 +129,16 @@ func (c *Canvas) init() (*Canvas, error) {
 	}
 
 	if gdi32.SetBkMode(c.hdc, gdi32.TRANSPARENT) == 0 {
-		return nil, newError("SetBkMode failed")
+		return nil, errs.NewError("SetBkMode failed")
 	}
 
 	switch gdi32.SetStretchBltMode(c.hdc, gdi32.HALFTONE) {
 	case 0, kernel32.ERROR_INVALID_PARAMETER:
-		return nil, newError("SetStretchBltMode failed")
+		return nil, errs.NewError("SetStretchBltMode failed")
 	}
 
 	if !gdi32.SetBrushOrgEx(c.hdc, 0, 0, nil) {
-		return nil, newError("SetBrushOrgEx failed")
+		return nil, errs.NewError("SetBrushOrgEx failed")
 	}
 
 	return c, nil
@@ -180,7 +181,7 @@ func (c *Canvas) DPI() int {
 func (c *Canvas) withGdiObj(handle gdi32.HGDIOBJ, f func() error) error {
 	oldHandle := gdi32.SelectObject(c.hdc, handle)
 	if oldHandle == 0 {
-		return newError("SelectObject failed")
+		return errs.NewError("SelectObject failed")
 	}
 	defer gdi32.SelectObject(c.hdc, oldHandle)
 
@@ -195,7 +196,7 @@ func (c *Canvas) withFontAndTextColor(font *Font, color Color, f func() error) e
 	return c.withGdiObj(gdi32.HGDIOBJ(font.handleForDPI(c.DPI())), func() error {
 		oldColor := gdi32.SetTextColor(c.hdc, gdi32.COLORREF(color))
 		if oldColor == gdi32.CLR_INVALID {
-			return newError("SetTextColor failed")
+			return errs.NewError("SetTextColor failed")
 		}
 		defer func() {
 			gdi32.SetTextColor(c.hdc, oldColor)
@@ -247,7 +248,7 @@ func (c *Canvas) ellipsePixels(brush Brush, pen Pen, bounds Rectangle, sizeCorre
 			int32(bounds.X+bounds.Width+sizeCorrection),
 			int32(bounds.Y+bounds.Height+sizeCorrection)) {
 
-			return newError("Ellipse failed")
+			return errs.NewError("Ellipse failed")
 		}
 
 		return nil
@@ -288,7 +289,7 @@ func (c *Canvas) DrawImage(image Image, location Point) error {
 // DrawImagePixels draws image at given location (upper left) in native pixels unstretched.
 func (c *Canvas) DrawImagePixels(image Image, location Point) error {
 	if image == nil {
-		return newError("image cannot be nil")
+		return errs.NewError("image cannot be nil")
 	}
 
 	return image.draw(c.hdc, location)
@@ -304,7 +305,7 @@ func (c *Canvas) DrawImageStretched(image Image, bounds Rectangle) error {
 // DrawImageStretchedPixels draws image at given location in native pixels stretched.
 func (c *Canvas) DrawImageStretchedPixels(image Image, bounds Rectangle) error {
 	if image == nil {
-		return newError("image cannot be nil")
+		return errs.NewError("image cannot be nil")
 	}
 
 	if dsoc, ok := image.(interface {
@@ -327,7 +328,7 @@ func (c *Canvas) DrawBitmapWithOpacity(bmp *Bitmap, bounds Rectangle, opacity by
 // stretched.
 func (c *Canvas) DrawBitmapWithOpacityPixels(bmp *Bitmap, bounds Rectangle, opacity byte) error {
 	if bmp == nil {
-		return newError("bmp cannot be nil")
+		return errs.NewError("bmp cannot be nil")
 	}
 
 	return bmp.alphaBlend(c.hdc, bounds, opacity)
@@ -349,7 +350,7 @@ func (c *Canvas) DrawBitmapPartWithOpacity(bmp *Bitmap, dst, src Rectangle, opac
 // DrawBitmapPartWithOpacityPixels draws bitmap at given location in native pixels.
 func (c *Canvas) DrawBitmapPartWithOpacityPixels(bmp *Bitmap, dst, src Rectangle, opacity byte) error {
 	if bmp == nil {
-		return newError("bmp cannot be nil")
+		return errs.NewError("bmp cannot be nil")
 	}
 
 	return bmp.alphaBlendPart(c.hdc, dst, src, opacity)
@@ -366,12 +367,12 @@ func (c *Canvas) DrawLine(pen Pen, from, to Point) error {
 // DrawLinePixels draws a line between two points in native pixels.
 func (c *Canvas) DrawLinePixels(pen Pen, from, to Point) error {
 	if !gdi32.MoveToEx(c.hdc, int(from.X), int(from.Y), nil) {
-		return newError("MoveToEx failed")
+		return errs.NewError("MoveToEx failed")
 	}
 
 	return c.withPen(pen, func() error {
 		if !gdi32.LineTo(c.hdc, int32(to.X), int32(to.Y)) {
-			return newError("LineTo failed")
+			return errs.NewError("LineTo failed")
 		}
 
 		return nil
@@ -395,7 +396,7 @@ func (c *Canvas) DrawPolyline(pen Pen, points []Point) error {
 
 	return c.withPen(pen, func() error {
 		if !gdi32.Polyline(c.hdc, unsafe.Pointer(&pts[0].X), int32(len(pts))) {
-			return newError("Polyline failed")
+			return errs.NewError("Polyline failed")
 		}
 
 		return nil
@@ -415,7 +416,7 @@ func (c *Canvas) DrawPolylinePixels(pen Pen, points []Point) error {
 
 	return c.withPen(pen, func() error {
 		if !gdi32.Polyline(c.hdc, unsafe.Pointer(&pts[0].X), int32(len(pts))) {
-			return newError("Polyline failed")
+			return errs.NewError("Polyline failed")
 		}
 
 		return nil
@@ -439,7 +440,7 @@ func (c *Canvas) rectanglePixels(brush Brush, pen Pen, bounds Rectangle, sizeCor
 			int32(bounds.X+bounds.Width+sizeCorrection),
 			int32(bounds.Y+bounds.Height+sizeCorrection)) {
 
-			return newError("Rectangle_ failed")
+			return errs.NewError("Rectangle_ failed")
 		}
 
 		return nil
@@ -491,7 +492,7 @@ func (c *Canvas) roundedRectanglePixels(brush Brush, pen Pen, bounds Rectangle, 
 			int32(ellipseSize.Width),
 			int32(ellipseSize.Height)) {
 
-			return newError("RoundRect failed")
+			return errs.NewError("RoundRect failed")
 		}
 
 		return nil
@@ -563,7 +564,7 @@ func (c *Canvas) GradientFillRectanglePixels(color1, color2 Color, orientation O
 	}
 
 	if !gdi32.GradientFill(c.hdc, &vertices[0], 2, unsafe.Pointer(&indices), 1, o) {
-		return newError("GradientFill failed")
+		return errs.NewError("GradientFill failed")
 	}
 
 	return nil
@@ -589,7 +590,7 @@ func (c *Canvas) DrawTextPixels(text string, font *Font, color Color, bounds Rec
 			uint32(format)|user32.DT_EDITCONTROL,
 			nil)
 		if ret == 0 {
-			return newError("DrawTextEx failed")
+			return errs.NewError("DrawTextEx failed")
 		}
 
 		return nil
@@ -601,12 +602,12 @@ func (c *Canvas) fontHeight(font *Font) (height int, err error) {
 	err = c.withFontAndTextColor(font, 0, func() error {
 		var size gdi32.SIZE
 		if !gdi32.GetTextExtentPoint32(c.hdc, gM, 2, &size) {
-			return newError("GetTextExtentPoint32 failed")
+			return errs.NewError("GetTextExtentPoint32 failed")
 		}
 
 		height = int(size.CY)
 		if height == 0 {
-			return newError("invalid font height")
+			return errs.NewError("invalid font height")
 		}
 
 		return nil
@@ -620,7 +621,7 @@ func (c *Canvas) measureTextForDPI(text string, font *Font, bounds Rectangle, fo
 	hFont := gdi32.HGDIOBJ(font.handleForDPI(dpi))
 	oldHandle := gdi32.SelectObject(c.hdc, hFont)
 	if oldHandle == 0 {
-		err = newError("SelectObject failed")
+		err = errs.NewError("SelectObject failed")
 		return
 	}
 	defer gdi32.SelectObject(c.hdc, oldHandle)
@@ -640,7 +641,7 @@ func (c *Canvas) measureTextForDPI(text string, font *Font, bounds Rectangle, fo
 	height := user32.DrawTextEx(
 		c.hdc, strPtr, -1, rect, dtfmt, &params)
 	if height == 0 {
-		err = newError("DrawTextEx failed")
+		err = errs.NewError("DrawTextEx failed")
 		return
 	}
 
@@ -713,7 +714,7 @@ func (c *Canvas) measureAndModifyTextPixels(text string, font *Font, bounds Rect
 	hFont := gdi32.HGDIOBJ(font.handleForDPI(c.DPI()))
 	oldHandle := gdi32.SelectObject(c.measureTextMetafile.hdc, hFont)
 	if oldHandle == 0 {
-		err = newError("SelectObject failed")
+		err = errs.NewError("SelectObject failed")
 		return
 	}
 	defer gdi32.SelectObject(c.measureTextMetafile.hdc, oldHandle)
@@ -733,7 +734,7 @@ func (c *Canvas) measureAndModifyTextPixels(text string, font *Font, bounds Rect
 	height := user32.DrawTextEx(
 		c.measureTextMetafile.hdc, strPtr, -1, rect, dtfmt, &params)
 	if height == 0 {
-		err = newError("DrawTextEx failed")
+		err = errs.NewError("DrawTextEx failed")
 		return
 	}
 
