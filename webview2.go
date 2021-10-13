@@ -3,7 +3,6 @@ package winapi
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -27,10 +26,12 @@ func init() {
 	AppendToWalkInit(func() {
 		MustRegisterWindowClass(webView2WindowClass)
 	})
-	_, _, err := ole32.CoInitializeExCall.Call(0, 2)
-	if err != nil && !errors.Is(err, errOK) {
-		log.Printf("warning: CoInitializeEx call failed: %v", err)
-	}
+	//_, _, err := ole32.CoInitializeExCall.Call(0, 2)
+	p := 0
+	_ = ole32.CoInitializeEx(unsafe.Pointer(&p), 2)
+	// if err != nil && !errors.Is(err, errOK) {
+	// 	log.Printf("warning: CoInitializeEx call failed: %v", err)
+	// }
 }
 
 type WebView2 struct {
