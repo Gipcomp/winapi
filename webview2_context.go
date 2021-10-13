@@ -8,21 +8,21 @@ import (
 
 type webviewContextStore struct {
 	mu    sync.RWMutex
-	store map[windows.Handle]*WebView
+	store map[windows.Handle]*WebView2
 }
 
 var webviewContext = &webviewContextStore{
-	store: map[windows.Handle]*WebView{},
+	store: map[windows.Handle]*WebView2{},
 }
 
-func (wcs *webviewContextStore) set(hwnd windows.Handle, wv *WebView) {
+func (wcs *webviewContextStore) set(hwnd windows.Handle, wv *WebView2) {
 	wcs.mu.Lock()
 	defer wcs.mu.Unlock()
 
 	wcs.store[hwnd] = wv
 }
 
-func (wcs *webviewContextStore) get(hwnd windows.Handle) (*WebView, bool) {
+func (wcs *webviewContextStore) get(hwnd windows.Handle) (*WebView2, bool) {
 	wcs.mu.Lock()
 	defer wcs.mu.Unlock()
 

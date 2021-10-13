@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"unsafe"
 
+	"github.com/Gipcomp/win32/ole32"
 	"github.com/Gipcomp/win32/user32"
 	"github.com/Gipcomp/winapi/webviewloader"
 	"github.com/jchv/go-winloader"
@@ -26,8 +27,8 @@ func init() {
 		MustRegisterWindowClass(webView2WindowClass)
 	})
 	//_, _, err := ole32.CoInitializeExCall.Call(0, 2)
-	// p := 0
-	// _ = ole32.CoInitializeEx(unsafe.Pointer(&p), 2)
+	p := 0
+	_ = ole32.CoInitializeEx(unsafe.Pointer(&p), 2)
 	// if err != nil && !errors.Is(err, errOK) {
 	// 	log.Printf("warning: CoInitializeEx call failed: %v", err)
 	// }
