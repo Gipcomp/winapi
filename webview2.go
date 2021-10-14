@@ -78,6 +78,20 @@ func NewWebView2(parent Container) (*WebView2, error) {
 		return nil, err
 	}
 
+	webviewContext.set(wv.Handle(), wv)
+
+	if err := wv.browser.embed(wv); err != nil {
+		return nil, fmt.Errorf("failed to embed the browser: %w", err)
+	}
+
+	if err := wv.browser.resize(); err != nil {
+		return nil, fmt.Errorf("failed to resize the browser: %w", err)
+	}
+
+	if err := wv.browser.saveSettings(); err != nil {
+		return nil, fmt.Errorf("failed to save browser settings: %w", err)
+	}
+
 	if err := wv.browser.Navigate(wv.browser.config.initialURL); err != nil {
 		return nil, fmt.Errorf("failed at the initial navigation: %w", err)
 	}

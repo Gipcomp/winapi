@@ -3,26 +3,26 @@ package winapi
 import (
 	"sync"
 
-	"golang.org/x/sys/windows"
+	"github.com/Gipcomp/win32/handle"
 )
 
 type webviewContextStore struct {
 	mu    sync.RWMutex
-	store map[windows.Handle]*WebView2
+	store map[handle.HWND]*WebView2
 }
 
 var webviewContext = &webviewContextStore{
-	store: map[windows.Handle]*WebView2{},
+	store: map[handle.HWND]*WebView2{},
 }
 
-func (wcs *webviewContextStore) set(hwnd windows.Handle, wv *WebView2) {
+func (wcs *webviewContextStore) set(hwnd handle.HWND, wv *WebView2) {
 	wcs.mu.Lock()
 	defer wcs.mu.Unlock()
 
 	wcs.store[hwnd] = wv
 }
 
-func (wcs *webviewContextStore) get(hwnd windows.Handle) (*WebView2, bool) {
+func (wcs *webviewContextStore) get(hwnd handle.HWND) (*WebView2, bool) {
 	wcs.mu.Lock()
 	defer wcs.mu.Unlock()
 
