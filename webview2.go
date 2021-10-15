@@ -40,7 +40,7 @@ type WebView2 struct {
 	dll     winloader.Proc
 }
 
-func NewWebView2(parent Container) (*WebView2, error) {
+func NewWebView2(parent Container, options ...Option) (*WebView2, error) {
 	wv := &WebView2{
 		browser: &browser{
 			config: &browserConfig{
@@ -57,7 +57,6 @@ func NewWebView2(parent Container) (*WebView2, error) {
 			},
 		},
 	}
-
 	for _, s := range []string{"WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", "WEBVIEW2_USER_DATA_FOLDER", "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "WEBVIEW2_RELEASE_CHANNEL_PREFERENCE"} {
 		os.Unsetenv(s)
 	}
@@ -68,7 +67,6 @@ func NewWebView2(parent Container) (*WebView2, error) {
 	}
 
 	wv.dll = dll.Proc("CreateCoreWebView2EnvironmentWithOptions")
-
 	if err := InitWidget(
 		wv,
 		parent,
@@ -79,23 +77,18 @@ func NewWebView2(parent Container) (*WebView2, error) {
 	}
 
 	webviewContext.set(wv.Handle(), wv)
-
 	if err := wv.browser.embed(wv); err != nil {
 		return nil, fmt.Errorf("failed to embed the browser: %w", err)
 	}
-
 	if err := wv.browser.resize(); err != nil {
 		return nil, fmt.Errorf("failed to resize the browser: %w", err)
 	}
-
 	if err := wv.browser.saveSettings(); err != nil {
 		return nil, fmt.Errorf("failed to save browser settings: %w", err)
 	}
-
 	if err := wv.browser.Navigate(wv.browser.config.initialURL); err != nil {
 		return nil, fmt.Errorf("failed at the initial navigation: %w", err)
 	}
-
 	return wv, nil
 }
 
