@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build windows
 // +build windows
 
 package winapi
@@ -1244,7 +1245,7 @@ func (wb *WindowBase) text() string {
 }
 
 func (wb *WindowBase) setText(text string) error {
-	if err := setWindowText(wb.hWnd, text); err != nil {
+	if err := user32.SetWindowText(wb.hWnd, text); err != nil {
 		return err
 	}
 
@@ -1258,17 +1259,18 @@ func windowText(hwnd handle.HWND) string {
 	return syscall.UTF16ToString(buf)
 }
 
-func setWindowText(hwnd handle.HWND, text string) error {
-	strPtr, err := syscall.UTF16PtrFromString(text)
-	if err != nil {
-		return err
-	}
-	if win.TRUE != user32.SendMessage(hwnd, user32.WM_SETTEXT, 0, uintptr(unsafe.Pointer(strPtr))) {
-		return errs.NewError("WM_SETTEXT failed")
-	}
+// Exported to win32
+// func setWindowText(hwnd handle.HWND, text string) error {
+// 	strPtr, err := syscall.UTF16PtrFromString(text)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	if win.TRUE != user32.SendMessage(hwnd, user32.WM_SETTEXT, 0, uintptr(unsafe.Pointer(strPtr))) {
+// 		return errs.NewError("WM_SETTEXT failed")
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 func (wb *WindowBase) RestoreState() (err error) {
 	wb.ForEachDescendant(func(widget Widget) bool {
