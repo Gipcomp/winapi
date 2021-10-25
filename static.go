@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build windows
 // +build windows
 
 package winapi
@@ -177,7 +178,7 @@ func (s *static) setText(text string) (changed bool, err error) {
 		return false, err
 	}
 
-	if err := setWindowText(s.hwndStatic, text); err != nil {
+	if err := user32.SetWindowText(s.hwndStatic, text); err != nil {
 		return false, err
 	}
 

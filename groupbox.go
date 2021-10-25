@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
+//go:build windows
 // +build windows
 
 package winapi
@@ -233,14 +234,14 @@ func (gb *GroupBox) Title() string {
 
 func (gb *GroupBox) SetTitle(title string) error {
 	if gb.Checkable() {
-		if err := setWindowText(gb.hWndGroupBox, ""); err != nil {
+		if err := user32.SetWindowText(gb.hWndGroupBox, ""); err != nil {
 			return err
 		}
 
 		return gb.checkBox.SetText(title)
 	}
 
-	return setWindowText(gb.hWndGroupBox, title)
+	return user32.SetWindowText(gb.hWndGroupBox, title)
 }
 
 func (gb *GroupBox) Checkable() bool {
