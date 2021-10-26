@@ -34,12 +34,12 @@ func init() {
 
 type WebView2 struct {
 	WidgetBase
-	hwnd       handle.HWND
-	browser    *edge.Chromium
-	mainthread uint32
-	m          sync.Mutex
-	bindings   map[string]interface{}
-	dispatchq  []func()
+	hwnd          handle.HWND
+	browserObject *edge.Chromium
+	mainthread    uint32
+	m             sync.Mutex
+	bindings      map[string]interface{}
+	dispatchq     []func()
 }
 
 type rpcMessage struct {
@@ -66,7 +66,7 @@ func NewWebView2(debug bool, parent Container) (*WebView2, error) {
 	chromium := edge.NewChromium()
 	chromium.MessageCallback = wv.msgcb
 	chromium.Debug = debug
-	wv.browser = chromium
+	wv.browserObject = chromium
 
 	wv.mainthread = kernel32.GetCurrentThreadId() // w32.Kernel32GetCurrentThreadID.Call()
 	if !wv.Create(debug, wv.Handle()) {
@@ -175,15 +175,15 @@ func (wv *WebView2) msgcb(msg string) {
 func (wv *WebView2) Create(debug bool, hwnd handle.HWND) bool {
 	wv.hwnd = hwnd
 
-	if !wv.browser.Embed(wv.hwnd) {
+	if !wv.browserObject.Embed(wv.hwnd) {
 		return false
 	}
-	wv.browser.Resize()
+	wv.browserObject.Resize()
 	return true
 }
 
 func (wv *WebView2) Eval(js string) {
-	wv.browser.Eval(js)
+	wv.browserObject.Eval(js)
 }
 
 func (wv *WebView2) Dispatch(f func()) {
@@ -194,7 +194,7 @@ func (wv *WebView2) Dispatch(f func()) {
 }
 
 func (w *WebView2) SetURL(url string) {
-	w.browser.Navigate(url)
+	w.browserObject.Navigate(url)
 }
 
 func (wv *WebView2) CreateLayoutItem(ctx *LayoutContext) LayoutItem {
@@ -202,9 +202,9 @@ func (wv *WebView2) CreateLayoutItem(ctx *LayoutContext) LayoutItem {
 }
 
 func (w *WebView2) GetDefaultBackgroundColor() (*edge.COREWEBVIEW2_COLOR, error) {
-	return w.browser.GetDefaultBackgroundColor()
+	return w.browserObject.GetDefaultBackgroundColor()
 }
 
 func (w *WebView2) PutDefaultBackgroundColor(bgcolor edge.COREWEBVIEW2_COLOR) error {
-	return w.browser.PutDefaultBackgroundColor(bgcolor)
+	return w.browserObject.PutDefaultBackgroundColor(bgcolor)
 }
