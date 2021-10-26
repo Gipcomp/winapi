@@ -48,10 +48,10 @@ type rpcMessage struct {
 	Params []json.RawMessage `json:"params"`
 }
 
-// var (
-// 	windowContext     = map[handle.HWND]interface{}{}
-// 	windowContextSync sync.RWMutex
-// )
+var (
+	windowContext     = map[handle.HWND]interface{}{}
+	windowContextSync sync.RWMutex
+)
 
 func NewWebView2(debug bool, parent Container) (*WebView2, error) {
 	wv := &WebView2{}
@@ -77,17 +77,17 @@ func NewWebView2(debug bool, parent Container) (*WebView2, error) {
 
 func jsString(v interface{}) string { b, _ := json.Marshal(v); return string(b) }
 
-// func getWindowContext(wnd handle.HWND) interface{} {
-// 	windowContextSync.RLock()
-// 	defer windowContextSync.RUnlock()
-// 	return windowContext[wnd]
-// }
+func getWindowContext(wnd handle.HWND) interface{} {
+	windowContextSync.RLock()
+	defer windowContextSync.RUnlock()
+	return windowContext[wnd]
+}
 
-// func setWindowContext(wnd handle.HWND, data interface{}) {
-// 	windowContextSync.Lock()
-// 	defer windowContextSync.Unlock()
-// 	windowContext[wnd] = data
-// }
+func setWindowContext(wnd handle.HWND, data interface{}) {
+	windowContextSync.Lock()
+	defer windowContextSync.Unlock()
+	windowContext[wnd] = data
+}
 
 func (wv *WebView2) callbinding(d rpcMessage) (interface{}, error) {
 	wv.m.Lock()
@@ -174,7 +174,7 @@ func (wv *WebView2) msgcb(msg string) {
 
 func (wv *WebView2) Create(debug bool, hwnd handle.HWND) bool {
 	wv.hwnd = hwnd
-
+	setWindowContext(wv.hwnd, wv)
 	if !wv.browserObject.Embed(wv.hwnd) {
 		return false
 	}
