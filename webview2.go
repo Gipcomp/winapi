@@ -1,195 +1,210 @@
 package winapi
 
 import (
+	"encoding/json"
 	"errors"
-	"fmt"
-	"os"
-	"runtime"
-	"sync/atomic"
-	"syscall"
-	"unsafe"
+	"log"
+	"reflect"
+	"strconv"
+	"sync"
 
-	"github.com/Gipcomp/win32/ole32"
+	"github.com/Gipcomp/win32/handle"
+	"github.com/Gipcomp/win32/kernel32"
 	"github.com/Gipcomp/win32/user32"
-	"github.com/Gipcomp/winapi/webviewloader"
-	"github.com/jchv/go-winloader"
-	"golang.org/x/sys/windows"
+	"github.com/Gipcomp/winapi/edge"
 )
 
 const webView2WindowClass = `\o/ Walk_WebView2_Class \o/`
 
-var errOK = syscall.Errno(0)
-
 func init() {
-	runtime.LockOSThread()
-
 	AppendToWalkInit(func() {
-		MustRegisterWindowClass(webView2WindowClass)
+		MustRegisterWindowClass(webViewWindowClass)
 	})
-	//_, _, err := ole32.CoInitializeExCall.Call(0, 2)
-	p := 0
-	_ = ole32.CoInitializeEx(unsafe.Pointer(&p), 2)
-	// if err != nil && !errors.Is(err, errOK) {
-	// 	log.Printf("warning: CoInitializeEx call failed: %v", err)
-	// }
 }
+
+// type browser interface {
+// 	Embed(hwnd handle.HWND) bool
+// 	Resize()
+// 	Navigate(url string)
+// 	Init(script string)
+// 	Eval(script string)
+// 	GetDefaultBackgroundColor() (*edge.COREWEBVIEW2_COLOR, error)
+// 	PutDefaultBackgroundColor(backgroundColor edge.COREWEBVIEW2_COLOR) error
+// }
 
 type WebView2 struct {
 	WidgetBase
-	browser *browser
-	dll     winloader.Proc
+	hwnd       handle.HWND
+	browser    *edge.Chromium
+	mainthread uint32
+	m          sync.Mutex
+	bindings   map[string]interface{}
+	dispatchq  []func()
 }
 
-func NewWebView2(parent Container, options ...Option) (*WebView2, error) {
-	wv := &WebView2{
-		browser: &browser{
-			config: &browserConfig{
-				initialURL:           "about:blank",
-				builtInErrorPage:     true,
-				defaultContextMenus:  true,
-				defaultScriptDialogs: true,
-				devtools:             true,
-				hostObjects:          true,
-				script:               true,
-				statusBar:            true,
-				webMessage:           true,
-				zoomControl:          true,
-			},
-		},
-	}
-	for _, s := range []string{"WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", "WEBVIEW2_USER_DATA_FOLDER", "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "WEBVIEW2_RELEASE_CHANNEL_PREFERENCE"} {
-		os.Unsetenv(s)
-	}
+type rpcMessage struct {
+	ID     int               `json:"id"`
+	Method string            `json:"method"`
+	Params []json.RawMessage `json:"params"`
+}
 
-	dll, err := webviewloader.New()
-	if err != nil {
-		return nil, err
-	}
+// var (
+// 	windowContext     = map[handle.HWND]interface{}{}
+// 	windowContextSync sync.RWMutex
+// )
 
-	wv.dll = dll.Proc("CreateCoreWebView2EnvironmentWithOptions")
+func NewWebView2(debug bool, parent Container) (*WebView2, error) {
+	wv := &WebView2{}
 	if err := InitWidget(
 		wv,
 		parent,
-		webViewWindowClass,
+		webView2WindowClass,
 		user32.WS_CLIPCHILDREN|user32.WS_VISIBLE,
 		0); err != nil {
 		return nil, err
 	}
+	chromium := edge.NewChromium()
+	chromium.MessageCallback = wv.msgcb
+	chromium.Debug = debug
+	wv.browser = chromium
 
-	webviewContext.set(wv.Handle(), wv)
-	if err := wv.browser.embed(wv); err != nil {
-		return nil, fmt.Errorf("failed to embed the browser: %w", err)
-	}
-	if err := wv.browser.resize(); err != nil {
-		return nil, fmt.Errorf("failed to resize the browser: %w", err)
-	}
-	if err := wv.browser.saveSettings(); err != nil {
-		return nil, fmt.Errorf("failed to save browser settings: %w", err)
-	}
-	if err := wv.browser.Navigate(wv.browser.config.initialURL); err != nil {
-		return nil, fmt.Errorf("failed at the initial navigation: %w", err)
+	wv.mainthread = kernel32.GetCurrentThreadId() // w32.Kernel32GetCurrentThreadID.Call()
+	if !wv.Create(debug, wv.Handle()) {
+		return nil, errors.New("failed to create webview2")
 	}
 	return wv, nil
+}
+
+func jsString(v interface{}) string { b, _ := json.Marshal(v); return string(b) }
+
+// func getWindowContext(wnd handle.HWND) interface{} {
+// 	windowContextSync.RLock()
+// 	defer windowContextSync.RUnlock()
+// 	return windowContext[wnd]
+// }
+
+// func setWindowContext(wnd handle.HWND, data interface{}) {
+// 	windowContextSync.Lock()
+// 	defer windowContextSync.Unlock()
+// 	windowContext[wnd] = data
+// }
+
+func (wv *WebView2) callbinding(d rpcMessage) (interface{}, error) {
+	wv.m.Lock()
+	f, ok := wv.bindings[d.Method]
+	wv.m.Unlock()
+	if !ok {
+		return nil, nil
+	}
+
+	v := reflect.ValueOf(f)
+	isVariadic := v.Type().IsVariadic()
+	numIn := v.Type().NumIn()
+	if (isVariadic && len(d.Params) < numIn-1) || (!isVariadic && len(d.Params) != numIn) {
+		return nil, errors.New("function arguments mismatch")
+	}
+	args := []reflect.Value{}
+	for i := range d.Params {
+		var arg reflect.Value
+		if isVariadic && i >= numIn-1 {
+			arg = reflect.New(v.Type().In(numIn - 1).Elem())
+		} else {
+			arg = reflect.New(v.Type().In(i))
+		}
+		if err := json.Unmarshal(d.Params[i], arg.Interface()); err != nil {
+			return nil, err
+		}
+		args = append(args, arg.Elem())
+	}
+
+	errorType := reflect.TypeOf((*error)(nil)).Elem()
+	res := v.Call(args)
+	switch len(res) {
+	case 0:
+		// No results from the function, just return nil
+		return nil, nil
+
+	case 1:
+		// One result may be a value, or an error
+		if res[0].Type().Implements(errorType) {
+			if res[0].Interface() != nil {
+				return nil, res[0].Interface().(error)
+			}
+			return nil, nil
+		}
+		return res[0].Interface(), nil
+
+	case 2:
+		// Two results: first one is value, second is error
+		if !res[1].Type().Implements(errorType) {
+			return nil, errors.New("second return value must be an error")
+		}
+		if res[1].Interface() == nil {
+			return res[0].Interface(), nil
+		}
+		return res[0].Interface(), res[1].Interface().(error)
+
+	default:
+		return nil, errors.New("unexpected number of return values")
+	}
+}
+
+func (wv *WebView2) msgcb(msg string) {
+	d := rpcMessage{}
+	if err := json.Unmarshal([]byte(msg), &d); err != nil {
+		log.Printf("invalid RPC message: %v", err)
+		return
+	}
+
+	id := strconv.Itoa(d.ID)
+	if res, err := wv.callbinding(d); err != nil {
+		wv.Dispatch(func() {
+			wv.Eval("window._rpc[" + id + "].reject(" + jsString(err.Error()) + "); window._rpc[" + id + "] = undefined")
+		})
+	} else if b, err := json.Marshal(res); err != nil {
+		wv.Dispatch(func() {
+			wv.Eval("window._rpc[" + id + "].reject(" + jsString(err.Error()) + "); window._rpc[" + id + "] = undefined")
+		})
+	} else {
+		wv.Dispatch(func() {
+			wv.Eval("window._rpc[" + id + "].resolve(" + string(b) + "); window._rpc[" + id + "] = undefined")
+		})
+	}
+}
+
+func (wv *WebView2) Create(debug bool, hwnd handle.HWND) bool {
+	wv.hwnd = hwnd
+
+	if !wv.browser.Embed(wv.hwnd) {
+		return false
+	}
+	wv.browser.Resize()
+	return true
+}
+
+func (wv *WebView2) Eval(js string) {
+	wv.browser.Eval(js)
+}
+
+func (wv *WebView2) Dispatch(f func()) {
+	wv.m.Lock()
+	wv.dispatchq = append(wv.dispatchq, f)
+	wv.m.Unlock()
+	kernel32.PostThreadMessageW.Call(uintptr(wv.mainthread), user32.WM_APP, 0, 0)
+}
+
+func (w *WebView2) SetURL(url string) {
+	w.browser.Navigate(url)
 }
 
 func (wv *WebView2) CreateLayoutItem(ctx *LayoutContext) LayoutItem {
 	return NewGreedyLayoutItem()
 }
 
-func (b *browser) saveSetting(setter uintptr, enabled bool) error {
-	var flag uintptr = 0
-
-	if enabled {
-		flag = 1
-	}
-
-	_, _, err := syscall.Syscall(
-		setter, 3,
-		uintptr(unsafe.Pointer(b.settings)),
-		flag,
-		0,
-	)
-
-	if !errors.Is(err, errOK) {
-		return fmt.Errorf("failed to save a setting: %w", err)
-	}
-
-	return nil
+func (w *WebView2) GetDefaultBackgroundColor() (*edge.COREWEBVIEW2_COLOR, error) {
+	return w.browser.GetDefaultBackgroundColor()
 }
 
-func (b *browser) saveSettings() error {
-	if err := b.saveSetting(b.settings.VTBL.PutIsBuiltInErrorPageEnabled, b.config.builtInErrorPage); err != nil {
-		return err
-	}
-
-	if err := b.saveSetting(b.settings.VTBL.PutAreDefaultContextMenusEnabled, b.config.defaultContextMenus); err != nil {
-		return err
-	}
-
-	if err := b.saveSetting(b.settings.VTBL.PutAreDefaultScriptDialogsEnabled, b.config.defaultScriptDialogs); err != nil {
-		return err
-	}
-
-	if err := b.saveSetting(b.settings.VTBL.PutAreDevToolsEnabled, b.config.devtools); err != nil {
-		return err
-
-	}
-
-	if err := b.saveSetting(b.settings.VTBL.PutAreHostObjectsAllowed, b.config.hostObjects); err != nil {
-		return err
-	}
-
-	if err := b.saveSetting(b.settings.VTBL.PutIsScriptEnabled, b.config.script); err != nil {
-		return err
-	}
-
-	if err := b.saveSetting(b.settings.VTBL.PutIsStatusBarEnabled, b.config.statusBar); err != nil {
-		return err
-
-	}
-
-	if err := b.saveSetting(b.settings.VTBL.PutIsWebMessageEnabled, b.config.webMessage); err != nil {
-		return err
-	}
-
-	return b.saveSetting(b.settings.VTBL.PutIsZoomControlEnabled, b.config.zoomControl)
-}
-
-func (wv *WebView2) environmentCompletedHandler() uintptr {
-	h := &ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler{
-		VTBL: &ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandlerVTBL{
-			Invoke: windows.NewCallback(func(i uintptr, p uintptr, createdEnvironment *ICoreWebView2Environment) uintptr {
-				_, _, _ = syscall.Syscall(createdEnvironment.VTBL.CreateCoreWebView2Controller, 3, uintptr(unsafe.Pointer(createdEnvironment)), uintptr(wv.Handle()), wv.controllerCompletedHandler())
-				return 0
-			}),
-		},
-	}
-
-	h.VTBL.BasicVTBL = NewBasicVTBL(&h.Basic)
-	return uintptr(unsafe.Pointer(h))
-}
-
-func (wv *WebView2) controllerCompletedHandler() uintptr {
-	h := &ICoreWebView2CreateCoreWebView2ControllerCompletedHandler{
-		VTBL: &ICoreWebView2CreateCoreWebView2ControllerCompletedHandlerVTBL{
-			Invoke: windows.NewCallback(func(i *ICoreWebView2CreateCoreWebView2ControllerCompletedHandler, p uintptr, createdController *ICoreWebView2Controller) uintptr {
-				_, _, _ = syscall.Syscall(createdController.VTBL.AddRef, 1, uintptr(unsafe.Pointer(createdController)), 0, 0)
-				wv.browser.controller = createdController
-
-				createdWebView2 := new(ICoreWebView2)
-
-				_, _, _ = syscall.Syscall(createdController.VTBL.GetCoreWebView2, 2, uintptr(unsafe.Pointer(createdController)), uintptr(unsafe.Pointer(&createdWebView2)), 0)
-				wv.browser.view = createdWebView2
-
-				_, _, _ = syscall.Syscall(wv.browser.view.VTBL.AddRef, 1, uintptr(unsafe.Pointer(wv.browser.view)), 0, 0)
-
-				atomic.StoreInt32(&wv.browser.controllerCompleted, 1)
-
-				return 0
-			}),
-		},
-	}
-
-	h.VTBL.BasicVTBL = NewBasicVTBL(&h.Basic)
-	return uintptr(unsafe.Pointer(h))
+func (w *WebView2) PutDefaultBackgroundColor(bgcolor edge.COREWEBVIEW2_COLOR) error {
+	return w.browser.PutDefaultBackgroundColor(bgcolor)
 }
