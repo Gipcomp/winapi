@@ -22,20 +22,20 @@ func init() {
 	})
 }
 
-// type browser interface {
-// 	Embed(hwnd handle.HWND) bool
-// 	Resize()
-// 	Navigate(url string)
-// 	Init(script string)
-// 	Eval(script string)
-// 	GetDefaultBackgroundColor() (*edge.COREWEBVIEW2_COLOR, error)
-// 	PutDefaultBackgroundColor(backgroundColor edge.COREWEBVIEW2_COLOR) error
-// }
+type browser interface {
+	Embed(hwnd handle.HWND) bool
+	Resize()
+	Navigate(url string)
+	Init(script string)
+	Eval(script string)
+	GetDefaultBackgroundColor() (*edge.COREWEBVIEW2_COLOR, error)
+	PutDefaultBackgroundColor(backgroundColor edge.COREWEBVIEW2_COLOR) error
+}
 
 type WebView2 struct {
 	WidgetBase
 	hwnd          handle.HWND
-	browserObject *edge.Chromium
+	browserObject browser
 	mainthread    uint32
 	m             sync.Mutex
 	bindings      map[string]interface{}
