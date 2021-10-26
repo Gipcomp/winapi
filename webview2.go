@@ -18,7 +18,7 @@ const webView2WindowClass = `\o/ Walk_WebView2_Class \o/`
 
 func init() {
 	AppendToWalkInit(func() {
-		MustRegisterWindowClass(webViewWindowClass)
+		MustRegisterWindowClass(webView2WindowClass)
 	})
 }
 
