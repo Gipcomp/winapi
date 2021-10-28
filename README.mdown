@@ -1,7 +1,8 @@
-About Walk
+About WinApi
 ==========
 
-Walk is a "Windows Application Library Kit" for the Go Programming Language.
+this is a fork of the [walk Repository](https://github/lxn/walk)
+WinApi is a "Windows Application Library Kit" for the Go Programming Language.
 
 Its primarily useful for Desktop GUI development, but there is some more stuff.
 
@@ -12,15 +13,15 @@ Make sure you have a working Go installation.
 See [Getting Started](http://golang.org/doc/install.html)
 
 ##### Note
-Walk currently requires Go 1.11.x or later.
+WinApi currently requires Go 1.11.x or later.
 
 ##### To Install
 Now run `go get github.com/lxn/walk`
 
-Using Walk
+Using WinApi
 ==========
 
-The preferred way to create GUIs with Walk is to use its declarative sub package,
+The preferred way to create GUIs with WinApi is to use its declarative sub package,
 as illustrated in this small example:
 
 ##### `test.go`
@@ -29,13 +30,13 @@ as illustrated in this small example:
 package main
 
 import (
-	"github.com/lxn/walk"
-	. "github.com/lxn/walk/declarative"
+	"github.com/d4v1dw3bb/winapi"
+	. "github.com/d4v1dw3bb/winapi/declarative"
 	"strings"
 )
 
 func main() {
-	var inTE, outTE *walk.TextEdit
+	var inTE, outTE *winapi.TextEdit
 
 	MainWindow{
 		Title:   "SCREAMO",
@@ -104,12 +105,9 @@ To get rid of the cmd window, instead run
 
 ![alt tag](http://i.imgur.com/lUrgE2Q.png)
 
-##### More Examples
-There are some [examples](examples) that should get you started.
-
 Application Manifest Files
 ==========================
-Walk requires Common Controls 6. This means that you must put an appropriate
+WinApi requires Common Controls 6. This means that you must put an appropriate
 application manifest file either next to your executable or embedded as a
 resource.
 
@@ -127,7 +125,7 @@ CGo Optimizations
 =================
 
 The usual default message loop includes calls to win32 API functions, which incurs a decent amount
-of runtime overhead coming from Go. As an alternative to this, you may compile Walk using an
+of runtime overhead coming from Go. As an alternative to this, you may compile WinApi using an
 optional C implementation of the main message loop, by passing the `walk_use_cgo` build tag:
 
    go build -tags walk_use_cgo
